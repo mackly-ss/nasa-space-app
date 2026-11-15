@@ -388,11 +388,25 @@ export class SurfaceView {
     this.controls.enabled = true;
   }
 
-  // Arrival animation: drop from orbit to the overview.
-  async enter() {
+  // Arrival pose: high above the map, looking down. Kept within the controls' max distance
+  // (so nothing snaps it) and inside the fog range (so the ground stays visible).
+  placeForEntry() {
     const h = this.home;
-    this.setOrbit(h.target, 2600, 0.12, h.azim + 0.6);
-    await this.animateOrbit(h, 2600);
+    this.setOrbit(h.target, this.controls.maxDistance - 20, 0.12, h.azim + 0.6);
+  }
+
+  // Arrival animation: one continuous drop from the entry pose to the overview.
+  async enter() {
+    await this.animateOrbit(this.home, 2400);
+  }
+
+  // Name of the closest landmark or relic to the map centre (for the plain-words readout).
+  nearestPlace() {
+    const t = this.controls.target;
+    let best = null, bd = Infinity;
+    for (const l of this.labelEls) { const d = Math.hypot(l.x - t.x, l.z - t.z); if (d < bd) { bd = d; best = l.el.textContent; } }
+    for (const s of this.sites) { const d = Math.hypot(s.x - t.x, s.z - t.z); if (d < bd) { bd = d; best = s.r.name.split(' · ')[0]; } }
+    return bd < 100 ? best : null;
   }
 
   flyToRelic(id, duration = 1700) {

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SolarView } from './solar.js';
 import { SurfaceView } from './surface.js';
-import { RELICS, WORLDS, PROLOGUE, EPILOGUE, DOCUMENTARY, byId, forWorld, formatCoord } from './data.js';
+import { RELICS, WORLDS, PROLOGUE, EPILOGUE, DOCUMENTARY, byId, forWorld, formatCoord, plainPlace } from './data.js';
 import { Shards } from './shards.js';
 import { SHAPE_FOR } from './shapes.js';
 
@@ -125,7 +125,7 @@ function activate(v) {
 
 function showWorldTitle(world) {
   const w = WORLDS[world];
-  $('world-kicker').textContent = `Chapter ${w.chapter} · ${w.title} · ${forWorld(world).length} relics · not to scale`;
+  $('world-kicker').textContent = `Chapter ${w.chapter} · ${w.title} · ${forWorld(world).length} relics · simplified map`;
   $('world-name').textContent = w.name;
   $('world-blurb').textContent = w.blurb;
   const el = $('world-title');
@@ -136,7 +136,10 @@ function syncHud() {
   if (!(active instanceof SurfaceView)) return;
   $('alt-range').value = Math.round(active.altitude * 1000);
   const [lon, lat] = active.centerLonLat();
-  $('readout-center').textContent = `MAP CENTER  ${formatCoord(lat, lon)}`;
+  const near = active.nearestPlace();
+  const plain = plainPlace(lat, lon, active.world).split(',')[0];
+  $('readout-center').textContent = `Map centre: ${near ? `near ${near}` : plain[0].toLowerCase() + plain.slice(1)}`;
+  $('readout-coord').textContent = formatCoord(lat, lon);
 }
 $('alt-range').addEventListener('input', (e) => {
   if (active instanceof SurfaceView) { active.altitude = e.target.value / 1000; syncHud(); }
@@ -184,7 +187,7 @@ async function goWorld(world) {
     s = getSurface(world);           // builds terrain on first visit (covered by the curtain)
     setBodyView(world);
     activate(s);
-    s.setOrbit(s.home.target, 2600, 0.12, 0.6);
+    s.placeForEntry();
   });
   showWorldTitle(world);
   await s.enter();
@@ -488,8 +491,11 @@ function openCard(r) {
   $('card-title').textContent = r.name;
   $('card-place').textContent = r.place;
   $('card-status').textContent = r.status;
-  $('card-coord').textContent = r.lat !== undefined ? formatCoord(r.lat, r.lon) : 'Deep space';
-  $('card-coord').hidden = false;
+  const onWorld = r.lat !== undefined;
+  $('card-where-wrap').hidden = !onWorld;
+  $('card-where').textContent = onWorld ? plainPlace(r.lat, r.lon, r.world) : '';
+  $('card-coord').textContent = onWorld ? formatCoord(r.lat, r.lon) : '';
+  $('card-did').textContent = r.did || '';
   $('card-narration').textContent = r.narration || '';
   const yrs = new Date().getFullYear() - r.year;
   $('card-waiting').textContent = r.world === 'deep' ? `${yrs} years out there` : `Waiting ${yrs} years`;
