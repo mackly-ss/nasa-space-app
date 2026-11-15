@@ -638,7 +638,13 @@ function applyViewShift(cam) {
   const wide = window.innerWidth > 820;
   const cw = $('card').offsetWidth, ch = $('card').offsetHeight;
   const wantX = cardRelic && wide ? Math.min(220, (cw + 18) / 2) : 0;
-  const wantY = cardRelic && !wide ? ch * 0.42 : 0;
+  // On phones, centre the subject in the space left between the top panels and the card.
+  let wantY = 0;
+  if (!wide && (cardRelic || tour.on)) {
+    const top = tour.on && !$('tour').hidden ? $('tour').getBoundingClientRect().bottom : 60;
+    const bottom = cardRelic ? window.innerHeight - ch : window.innerHeight;
+    wantY = window.innerHeight / 2 - (top + bottom) / 2;
+  }
   shiftX += (wantX - shiftX) * 0.08;
   shiftY += (wantY - shiftY) * 0.08;
   const w = window.innerWidth, h = window.innerHeight;
