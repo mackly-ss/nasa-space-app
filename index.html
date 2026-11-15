@@ -93,6 +93,7 @@
 
   <div class="readout" id="readout">
     <span id="readout-center">—</span>
+    <span id="readout-coord" class="readout-coord"></span>
     <span class="hint">Drag to look · Right-drag or arrows to move · Scroll to zoom</span>
   </div>
 
@@ -108,12 +109,13 @@
       <p class="eyebrow" id="card-kicker"></p>
       <h3 id="card-title"></h3>
       <p class="card-place" id="card-place"></p>
+      <p class="card-where" id="card-where-wrap"><span id="card-where"></span><small class="mono" id="card-coord"></small></p>
       <div class="card-tags">
         <span class="tag status" id="card-status"></span>
-        <span class="tag mono" id="card-coord"></span>
         <span class="tag" id="card-waiting"></span>
       </div>
       <blockquote class="card-narration" id="card-narration"></blockquote>
+      <div class="card-did"><span class="did-label">What it did</span><p id="card-did"></p></div>
       <p class="card-story" id="card-story"></p>
       <h4>Left behind</h4>
       <ul class="left-list" id="card-left"></ul>
