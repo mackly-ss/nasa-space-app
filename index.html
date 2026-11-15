@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Abandoned, Not Forgotten</title>
+  <meta name="description" content="An interactive 3D journey to the machines NASA left behind on the Moon, Mars and in deep space. NASA Space Apps Challenge 2026.">
+  <meta name="theme-color" content="#04050c">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ffc27a'/%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%23ffc27a' stroke-width='1.5' opacity='.5'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+</head>
+<body data-view="intro">
+  <div id="stage"></div>
+
+  <!-- 3D overlays -->
+  <div id="labels" class="overlay-layer" hidden></div>
+  <div id="pins" class="overlay-layer" hidden></div>
+
+  <!-- Intro -->
+  <section id="intro" class="intro" aria-labelledby="intro-title">
+    <svg class="intro-art" id="intro-art" aria-hidden="true"></svg>
+    <div class="intro-inner">
+      <p class="eyebrow">NASA Space Apps Challenge · 2026</p>
+      <h1 id="intro-title">Abandoned,<br><em>Not Forgotten</em></h1>
+      <p class="lede">Since 1966, NASA has left hundreds of objects behind on other worlds: landers, moon buggies, rovers, a helicopter, even golf balls. Some still do science. Most went silent long ago.</p>
+      <p class="lede small">Every one of them is still out there, right where it stopped. Let's go and find them.</p>
+      <button class="btn primary" id="begin">Begin the journey <span aria-hidden="true">→</span></button>
+      <p class="loading" id="loading" aria-live="polite">Preparing the solar system…</p>
+    </div>
+  </section>
+
+  <!-- HUD -->
+  <header class="hud-top" id="hud">
+    <a class="brand" href="#/system" aria-label="Back to solar system">
+      <span class="brand-dot"></span>
+      <span>Abandoned, <em>Not Forgotten</em></span>
+    </a>
+    <div class="hud-right">
+      <button class="chip" id="progress-btn" aria-label="Relics discovered, open inventory">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg>
+        <span><b id="found-count">0</b>/<span id="total-count">0</span> relics</span>
+      </button>
+      <button class="chip" id="inventory-btn" aria-label="Open relic inventory">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        <span>Inventory</span>
+      </button>
+      <button class="chip map-btn" id="map-btn" aria-label="Back to the solar system map">
+        <span>MAP</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Surface: world title + altitude slider + readout -->
+  <div class="world-title" id="world-title" aria-live="polite">
+    <p class="eyebrow" id="world-kicker"></p>
+    <h2 id="world-name"></h2>
+    <p id="world-blurb"></p>
+  </div>
+
+  <div class="altitude" id="altitude" aria-label="Altitude">
+    <svg class="alt-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20l6-10 4 6 2-3 6 7z"/><path d="M8 11.5l1-1.5 1.5 2"/></svg>
+    <input type="range" id="alt-range" min="0" max="1000" value="700" aria-label="Camera altitude" orient="vertical">
+    <svg class="alt-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/></svg>
+  </div>
+
+  <div class="readout" id="readout">
+    <span id="readout-center">—</span>
+    <span class="hint">Drag to look · Right-drag or arrows to move · Scroll to zoom</span>
+  </div>
+
+  <div class="system-hint" id="system-hint">
+    <span>Click the <b>Moon</b> or <b>Mars</b> to land · Click glowing probes for deep-space stories</span>
+  </div>
+
+  <!-- Story card -->
+  <aside class="card" id="card" aria-live="polite" aria-labelledby="card-title" hidden>
+    <button class="card-close" id="card-close" aria-label="Close story">×</button>
+    <div class="card-scroll">
+      <div class="portrait"><svg id="card-art" aria-hidden="true"></svg></div>
+      <p class="eyebrow" id="card-kicker"></p>
+      <h3 id="card-title"></h3>
+      <p class="card-place" id="card-place"></p>
+      <div class="card-tags">
+        <span class="tag status" id="card-status"></span>
+        <span class="tag mono" id="card-coord"></span>
+      </div>
+      <p class="card-story" id="card-story"></p>
+      <h4>Left behind</h4>
+      <ul class="left-list" id="card-left"></ul>
+      <div class="dyk">
+        <span class="dyk-label">Did you know?</span>
+        <p id="card-fact"></p>
+      </div>
+      <a class="source" id="card-source" target="_blank" rel="noopener">NASA mission record ↗</a>
+    </div>
+    <nav class="card-nav">
+      <button class="btn ghost" id="card-prev">← Previous</button>
+      <button class="btn ghost" id="card-next">Next relic →</button>
+    </nav>
+  </aside>
+
+  <!-- Inventory -->
+  <aside class="inventory" id="inventory" aria-labelledby="inv-title" hidden>
+    <div class="inv-head">
+      <h3 id="inv-title">Relic Inventory</h3>
+      <button class="card-close" id="inv-close" aria-label="Close inventory">×</button>
+    </div>
+    <p class="inv-sub">Everything on this list is still out there. Pick one to travel to it.</p>
+    <label class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" id="inv-search" placeholder="Search rovers, flags, golf balls…" autocomplete="off">
+    </label>
+    <div class="inv-list" id="inv-list"></div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <!-- Relic timeline -->
+  <nav class="timeline" id="timeline" aria-label="Relic timeline">
+    <div class="tl-track" id="tl-track"></div>
+  </nav>
+
+  <!-- Shard curtain for world transitions -->
+  <div class="curtain" id="curtain" aria-hidden="true">
+    <svg id="curtain-art"></svg>
+    <p class="curtain-caption" id="curtain-caption"></p>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="fade" id="fade"></div>
+
+  <noscript><p class="noscript">This interactive experience needs JavaScript and WebGL.</p></noscript>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
