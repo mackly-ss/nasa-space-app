@@ -3,8 +3,10 @@ import { SolarView } from './solar.js';
 import { SurfaceView } from './surface.js';
 import { RELICS, WORLDS, PROLOGUE, EPILOGUE, DOCUMENTARY, byId, forWorld, formatCoord, plainPlace } from './data.js';
 import { Shards } from './shards.js';
-import { SHAPE_FOR } from './shapes.js';
+import { SHAPE_FOR, buildShapes } from './shapes.js';
 import { PROMPTS, QUESTS, questById } from './learn.js';
+import { EXTRAS, MESSAGES, BEATS, RANKS } from './extras.js';
+import { startGame, sfx } from './games.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -75,6 +77,7 @@ function discover(id) {
   $('progress-btn').classList.remove('pulse'); void $('progress-btn').offsetWidth; $('progress-btn').classList.add('pulse');
   renderInventory();
   updateTimeline();
+  setTimeout(checkProgress, 1800); // after the discovery toast
 }
 
 let toastTimer;
@@ -519,6 +522,7 @@ function openCard(r) {
   $('card-answer').value = learn.log[r.id] || '';
   $('log-saved').textContent = 'Saved automatically in this browser';
   checkQuest(r);
+  fillExtras(r);
   updateTimeline();
 }
 function closeCard() {
@@ -594,6 +598,8 @@ $('map-btn').addEventListener('click', () => { go('system'); });
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (!$('game-ov').hidden) { closeGame(); return; }
+    if (!$('sort-ov').hidden) { closeSort(); return; }
     if (!$('coldopen').classList.contains('done') && view === 'intro') endColdOpen();
     else if (chapterResolve) hideChapter();
     else if (!$('quest-end').hidden) hideQuestEnd();
@@ -704,6 +710,7 @@ function checkQuest(r) {
   banner.hidden = false;
   if (st.step >= q.clues.length) {
     st.done = true;
+    setTimeout(checkProgress, 5000);
     learn.active = null;
     saveLearn();
     renderTracker();
@@ -772,9 +779,10 @@ function logHTML() {
 function renderQuests() {
   $('tab-quests').setAttribute('aria-selected', String(qTab === 'quests'));
   $('tab-log').setAttribute('aria-selected', String(qTab === 'log'));
-  $('q-title').textContent = qTab === 'quests' ? 'Quests' : 'Mission Log';
+  $('tab-badges').setAttribute('aria-selected', String(qTab === 'badges'));
+  $('q-title').textContent = { quests: 'Quests', log: 'Mission Log', badges: 'Badges' }[qTab];
   $('log-count').textContent = `${Object.values(learn.log).filter((t) => t.trim()).length}/${RELICS.length}`;
-  $('q-list').innerHTML = qTab === 'quests' ? questsHTML() : logHTML();
+  $('q-list').innerHTML = qTab === 'quests' ? questsHTML() : qTab === 'log' ? logHTML() : badgesHTML();
   $('q-list').scrollTop = 0;
 }
 function openQuests(tab = qTab) {
@@ -782,7 +790,7 @@ function openQuests(tab = qTab) {
   renderQuests();
   $('quests').hidden = false; $('scrim').hidden = false;
   requestAnimationFrame(() => { $('quests').classList.add('open'); $('scrim').classList.add('on'); });
-  setTimeout(() => $(qTab === 'quests' ? 'tab-quests' : 'tab-log').focus({ preventScroll: true }), 50);
+  setTimeout(() => $('tab-' + qTab).focus({ preventScroll: true }), 50);
 }
 function closeQuests() {
   const el = $('quests');
@@ -798,6 +806,7 @@ $('quest-btn').addEventListener('click', () => openQuests());
 $('q-close').addEventListener('click', closeQuests);
 $('tab-quests').addEventListener('click', () => { qTab = 'quests'; renderQuests(); });
 $('tab-log').addEventListener('click', () => { qTab = 'log'; renderQuests(); });
+$('tab-badges').addEventListener('click', () => { qTab = 'badges'; renderQuests(); });
 $('q-list').addEventListener('click', (e) => {
   const s = e.target.closest('.q-start');
   if (s) { startQuest(s.dataset.q); return; }
@@ -820,11 +829,272 @@ $('card-answer').addEventListener('input', (e) => {
   learn.log[cardRelic.id] = e.target.value;
   $('log-saved').textContent = 'Saving…';
   clearTimeout(logTimer);
-  logTimer = setTimeout(() => { saveLearn(); $('log-saved').textContent = 'Saved ✓'; }, 400);
+  logTimer = setTimeout(() => { saveLearn(); $('log-saved').textContent = 'Saved ✓'; checkProgress(); }, 400);
 });
 // Keep typing (arrow keys, etc.) from moving the 3D map.
 $('card-answer').addEventListener('keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
 renderTracker();
+
+/* ---------------- Comics, quizzes, mini games, messages, badges ---------------- */
+// Free exploration only, like the quests. Saved in this browser.
+const XKEY = 'anf-extras-v1';
+const xs = (() => { try { return JSON.parse(localStorage.getItem(XKEY)) || {}; } catch { return {}; } })();
+for (const k of ['quiz', 'won', 'carry', 'delivered', 'badges']) xs[k] ||= {};
+const saveX = () => { try { localStorage.setItem(XKEY, JSON.stringify(xs)); } catch { /* private mode */ } };
+
+/* Static low-poly portrait (same art as the card), used for comic panels */
+let shapeCache = null;
+function portraitSVG(id, cls = '') {
+  shapeCache ||= buildShapes().shapes;
+  const tris = shapeCache[SHAPE_FOR[id]] || [];
+  return `<svg class="${cls}" viewBox="0 0 100 100" aria-hidden="true">${tris.map((t) => {
+    const c = `rgb(${t.rgb.map((v) => v | 0).join(',')})`;
+    return `<polygon points="${t.p.map((q) => q.map((v) => v.toFixed(1)).join(',')).join(' ')}" fill="${c}" stroke="${c}" opacity="${t.o ?? 1}"/>`;
+  }).join('')}</svg>`;
+}
+
+/* Card tabs */
+function selectTab(tab) {
+  for (const b of document.querySelectorAll('#card-tabs .ct')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  for (const p of document.querySelectorAll('#card .pane')) p.hidden = p.dataset.pane !== tab;
+  $('card').querySelector('.card-scroll').scrollTop = Math.min($('card').querySelector('.card-scroll').scrollTop, $('card-tabs').offsetTop - 20);
+}
+$('card-tabs').addEventListener('click', (e) => { const b = e.target.closest('.ct'); if (b) selectTab(b.dataset.tab); });
+
+function fillExtras(r) {
+  const x = EXTRAS[r.id];
+  selectTab('story');
+  $('ct-game').hidden = !x.game;
+  // Comic: four beats, each with a differently lit portrait
+  $('card-comic').innerHTML = `<p class="pane-sub">${r.name} in four panels.</p>` + x.panels.map(([narr, voice], i) => `
+    <figure class="panel p${i + 1}">
+      <div class="panel-art">${portraitSVG(r.id)}<span class="panel-n">${i + 1}</span></div>
+      <figcaption><span class="beat">${BEATS[i]}</span><p>${narr}</p><q>${voice}</q></figcaption>
+    </figure>`).join('');
+  renderQuiz(r);
+  renderGamePane(r);
+  renderMessage(r);
+}
+
+/* Quiz: the first answer counts towards the Quiz Whiz badge */
+function renderQuiz(r, picked = null) {
+  const q = EXTRAS[r.id].quiz, first = xs.quiz[r.id];
+  const answered = picked !== null || first;
+  $('card-quiz').innerHTML = `<p class="quiz-q">${q.q}</p>
+    <div class="quiz-o">${q.o.map((o, i) => {
+      let cls = '';
+      if (answered && i === q.a) cls = 'right';
+      else if (picked === i) cls = 'wrong';
+      return `<button class="qo ${cls}" data-i="${i}" ${answered ? 'disabled' : ''}>${o}</button>`;
+    }).join('')}</div>
+    ${answered ? `<p class="quiz-why"><b>${picked === null ? (first === 'right' ? '✓ You got this one right.' : 'You\'ve answered this one.') : picked === q.a ? '✓ Correct!' : 'Not quite.'}</b> ${q.why}</p>
+      ${picked === null ? '<button class="btn ghost quiz-again">Try it again</button>' : ''}` : ''}`;
+}
+$('card-quiz').addEventListener('click', (e) => {
+  if (!cardRelic) return;
+  if (e.target.closest('.quiz-again')) { $('card-quiz').innerHTML = ''; renderQuizFresh(cardRelic); return; }
+  const b = e.target.closest('.qo');
+  if (!b || b.disabled) return;
+  const i = +b.dataset.i, q = EXTRAS[cardRelic.id].quiz;
+  if (!xs.quiz[cardRelic.id]) { xs.quiz[cardRelic.id] = i === q.a ? 'right' : 'wrong'; saveX(); checkProgress(); }
+  (i === q.a ? sfx.right : sfx.wrong)();
+  renderQuiz(cardRelic, i);
+});
+function renderQuizFresh(r) { const keep = xs.quiz[r.id]; delete xs.quiz[r.id]; renderQuiz(r); xs.quiz[r.id] = keep; }
+
+/* Mini game pane + full-screen overlay */
+function renderGamePane(r) {
+  const g = EXTRAS[r.id].game;
+  if (!g) { $('card-game').innerHTML = ''; return; }
+  $('card-game').innerHTML = `<p class="pane-sub">${xs.won[r.id] ? '✓ Completed' : 'Mini game'}</p>
+    <h4 class="game-title">${g.title}</h4><p class="game-how">${g.how}</p>
+    <button class="btn primary" id="play-btn">${xs.won[r.id] ? 'Play again' : 'Play'} <span aria-hidden="true">→</span></button>`;
+}
+let gameRelic = null;
+function openGame(r) {
+  gameRelic = r;
+  const g = EXTRAS[r.id].game;
+  $('go-kicker').textContent = `Mini game · ${r.name}`;
+  $('go-title').textContent = g.title;
+  $('go-how').textContent = g.how;
+  if (active.controls) active.controls.enabled = false; // keep Space/arrows for the game
+  const el = $('game-ov');
+  el.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
+  runGame();
+}
+function runGame() {
+  const r = gameRelic, g = EXTRAS[r.id].game;
+  // A fresh stage each time, so the old game's loops (which watch stage.isConnected) stop.
+  const old = $('go-stage'), stage = old.cloneNode(false);
+  stage.className = 'stage';
+  old.replaceWith(stage);
+  $('go-done').hidden = true;
+  const setStatus = (t, ok) => { $('go-status').textContent = t; $('go-status').classList.toggle('ok', !!ok); };
+  let finished = false;
+  const won = () => {
+    if (finished || !stage.isConnected) return;
+    finished = true;
+    sfx.win();
+    setStatus('Complete! Well done.', true);
+    $('go-done').hidden = false;
+    $('go-done').focus({ preventScroll: true });
+    if (!xs.won[r.id]) { xs.won[r.id] = Date.now(); saveX(); checkProgress(); }
+    if (cardRelic?.id === r.id) renderGamePane(r);
+  };
+  setStatus('');
+  startGame(stage, r, g, EXTRAS[r.id].parts, won, setStatus);
+}
+function closeGame() {
+  const el = $('game-ov');
+  el.classList.remove('open');
+  const stage = $('go-stage'), blank = stage.cloneNode(false);
+  stage.replaceWith(blank);
+  if (active.controls) active.controls.enabled = true;
+  setTimeout(() => { if (!el.classList.contains('open')) el.hidden = true; }, 400);
+}
+$('card-game').addEventListener('click', (e) => { if (e.target.closest('#play-btn') && cardRelic) openGame(cardRelic); });
+$('go-reset').addEventListener('click', runGame);
+$('go-close').addEventListener('click', closeGame);
+$('go-done').addEventListener('click', closeGame);
+
+/* Messages between machines: pick one up at `from`, deliver it by opening `to` */
+function renderMessage(r) {
+  const box = $('card-msg');
+  box.hidden = true;
+  if (tour.on) return;
+  const name = (id) => byId(id).name;
+  const incoming = MESSAGES.find((m) => m.to === r.id && xs.carry[m.from] && !xs.delivered[m.from]);
+  if (incoming) {
+    xs.delivered[incoming.from] = Date.now();
+    delete xs.carry[incoming.from];
+    saveX();
+    sfx.win();
+    box.innerHTML = `<span class="msg-label">✓ Message delivered</span>
+      <blockquote><b>${name(incoming.from)} wrote</b>“${incoming.msg}”</blockquote>
+      <blockquote><b>${name(incoming.to)} replies</b>“${incoming.reply}”</blockquote>`;
+    box.hidden = false;
+    setTimeout(() => toast(`<b>Message delivered</b> to ${name(incoming.to)}`), 1200);
+    setTimeout(checkProgress, 2400);
+    return;
+  }
+  const out = MESSAGES.find((m) => m.from === r.id);
+  const done = MESSAGES.find((m) => (m.from === r.id || m.to === r.id) && xs.delivered[m.from]);
+  if (out && !xs.delivered[out.from]) {
+    box.innerHTML = xs.carry[out.from]
+      ? `<span class="msg-label">Message in your bag</span><p>You're carrying ${name(out.from)}'s message. Open <b>${name(out.to)}</b>'s story to deliver it.</p>`
+      : `<span class="msg-label">A message to deliver</span><p>${name(out.from)} has a message for <b>${name(out.to)}</b>.</p><button class="btn ghost" id="msg-take">Carry the message</button>`;
+    box.hidden = false;
+  } else if (done) {
+    box.innerHTML = `<span class="msg-label">Messages</span>
+      <blockquote><b>${name(done.from)} wrote</b>“${done.msg}”</blockquote>
+      <blockquote><b>${name(done.to)} replied</b>“${done.reply}”</blockquote>`;
+    box.hidden = false;
+  }
+}
+$('card-msg').addEventListener('click', (e) => {
+  if (!e.target.closest('#msg-take') || !cardRelic) return;
+  const m = MESSAGES.find((x) => x.from === cardRelic.id);
+  xs.carry[m.from] = Date.now();
+  saveX();
+  sfx.right();
+  toast(`Message picked up. Deliver it to <b>${byId(m.to).name}</b>.`);
+  renderMessage(cardRelic);
+});
+
+/* Timeline sorting */
+let sortSet = [];
+function newSortSet() {
+  const pool = [...RELICS].sort(() => Math.random() - 0.5), years = new Set();
+  sortSet = [];
+  for (const r of pool) { if (!years.has(r.year)) { years.add(r.year); sortSet.push(r); } if (sortSet.length === 6) break; }
+  if (sortSet.every((r, i) => !i || sortSet[i - 1].year < r.year)) sortSet.reverse();
+  renderSort();
+  $('sort-status').textContent = '';
+  $('sort-status').classList.remove('ok');
+}
+function renderSort(checked = false) {
+  $('sort-row').innerHTML = sortSet.map((r, i) => {
+    const ok = checked && (!i || sortSet[i - 1].year <= r.year) && (i === sortSet.length - 1 || r.year <= sortSet[i + 1].year);
+    return `<li class="sort-item w-${r.world} ${checked ? (ok ? 'ok' : 'bad') : ''}">
+      ${portraitSVG(r.id, 'sort-art')}
+      <b>${r.name}</b><small>${WORLDS[r.world].name}${checked ? ` · ${r.year}` : ''}</small>
+      <span class="sort-move"><button data-i="${i}" data-d="-1" aria-label="Move ${r.name} earlier" ${i ? '' : 'disabled'}>←</button><button data-i="${i}" data-d="1" aria-label="Move ${r.name} later" ${i < sortSet.length - 1 ? '' : 'disabled'}>→</button></span>
+    </li>`;
+  }).join('');
+}
+function openSort() {
+  newSortSet();
+  const el = $('sort-ov');
+  el.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
+}
+function closeSort() {
+  const el = $('sort-ov');
+  el.classList.remove('open');
+  setTimeout(() => { if (!el.classList.contains('open')) el.hidden = true; }, 400);
+}
+$('sort-row').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-d]');
+  if (!b) return;
+  const i = +b.dataset.i, j = i + +b.dataset.d;
+  [sortSet[i], sortSet[j]] = [sortSet[j], sortSet[i]];
+  sfx.click();
+  renderSort();
+  $('sort-row').querySelector(`button[data-i="${j}"][data-d="${b.dataset.d}"]`)?.focus();
+});
+$('sort-check').addEventListener('click', () => {
+  const right = sortSet.every((r, i) => !i || sortSet[i - 1].year <= r.year);
+  renderSort(true);
+  $('sort-status').textContent = right ? '✓ Perfect order. You\'re a real historian.' : 'Not quite. The years are shown now. Fix the red ones and check again.';
+  $('sort-status').classList.toggle('ok', right);
+  (right ? sfx.win : sfx.wrong)();
+  if (right && !xs.sorted) { xs.sorted = Date.now(); saveX(); checkProgress(); }
+});
+$('sort-new').addEventListener('click', newSortSet);
+$('so-close').addEventListener('click', closeSort);
+$('tl-sort').addEventListener('click', openSort);
+
+/* Ranks and badges */
+const rankOf = (n) => RANKS.filter((r) => n >= r[0]).pop()[1];
+const nextRank = (n) => RANKS.find((r) => r[0] > n);
+const allFound = (w) => forWorld(w).every((r) => found.has(r.id));
+const BADGES = [
+  { id: 'first', name: 'First Find', desc: 'Open your first relic story', test: () => found.size >= 1 },
+  { id: 'shore', name: 'The Shore', desc: 'Find all 7 Moon relics', test: () => allFound('moon') },
+  { id: 'shift', name: 'The Long Shift', desc: 'Find all 8 Mars relics', test: () => allFound('mars') },
+  { id: 'drift', name: 'The Drift', desc: 'Find all 5 deep-space relics', test: () => allFound('deep') },
+  { id: 'quiz', name: 'Quiz Whiz', desc: 'Answer 10 quizzes right the first time', test: () => Object.values(xs.quiz).filter((v) => v === 'right').length >= 10 },
+  { id: 'pilot', name: 'Ace Pilot', desc: 'Complete 10 mini games', test: () => Object.keys(xs.won).length >= 10 },
+  { id: 'historian', name: 'Historian', desc: 'Put the timeline in the right order', test: () => !!xs.sorted },
+  { id: 'messenger', name: 'Messenger', desc: 'Deliver all 6 messages between machines', test: () => MESSAGES.every((m) => xs.delivered[m.from]) },
+  { id: 'quests', name: 'Quest Master', desc: 'Complete all 9 quests', test: () => QUESTS.every((q) => progressOf(q).done) },
+  { id: 'writer', name: 'Field Writer', desc: 'Write 5 mission log entries', test: () => Object.values(learn.log).filter((t) => t.trim()).length >= 5 },
+];
+function checkProgress() {
+  const fresh = BADGES.filter((b) => !xs.badges[b.id] && b.test());
+  fresh.forEach((b) => { xs.badges[b.id] = Date.now(); });
+  const rank = rankOf(found.size), rankUp = xs.rank && rank !== xs.rank;
+  xs.rank = rank;
+  if (fresh.length || rankUp) saveX();
+  if (tour.on) return;
+  const msgs = [...fresh.map((b) => `Badge earned: <b>${b.name}</b>`), ...(rankUp ? [`New rank: <b>${rank}</b>`] : [])];
+  msgs.forEach((m, i) => setTimeout(() => toast(m), i * 3400));
+  if (fresh.length) sfx.win();
+}
+function badgesHTML() {
+  const n = found.size, nr = nextRank(n), earned = BADGES.filter((b) => xs.badges[b.id]).length;
+  return `<div class="rank-card"><span class="rank-label">Your rank</span><b>${rankOf(n)}</b>
+      <small>${nr ? `Find ${nr[0] - n} more relic${nr[0] - n === 1 ? '' : 's'} to become ${nr[1]}.` : 'The highest rank. Every relic found.'}</small>
+      <div class="rank-bar"><i style="width:${n / RELICS.length * 100}%"></i></div></div>
+    <h4 class="log-h">Badges <span>${earned}/${BADGES.length}</span></h4>
+    <ul class="badge-grid">${BADGES.map((b) => `<li class="${xs.badges[b.id] ? 'on' : ''}"><span aria-hidden="true">${xs.badges[b.id] ? '✓' : ''}</span><b>${b.name}</b><small>${b.desc}</small></li>`).join('')}</ul>
+    <h4 class="log-h">Activities</h4>
+    <p class="inv-sub">Quizzes answered: ${Object.keys(xs.quiz).length}/${RELICS.length} · Mini games completed: ${Object.keys(xs.won).length}/${Object.values(EXTRAS).filter((x) => x.game).length} · Messages delivered: ${Object.keys(xs.delivered).length}/${MESSAGES.length}</p>
+    <button class="btn ghost" id="badges-sort">Play the timeline challenge</button>`;
+}
+$('q-list').addEventListener('click', (e) => { if (e.target.closest('#badges-sort')) { closeQuests(); openSort(); } });
+xs.rank ||= rankOf(found.size);
 
 /* ---------------- Loop ---------------- */
 function resize() {

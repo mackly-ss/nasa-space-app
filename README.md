@@ -13,6 +13,11 @@ An interactive 3D storytelling site about the machines NASA left behind on the M
 - **Story cards**: stories written for ages 13–17, a "Left behind" list, a "Did you know?" fact and a link to the NASA record (NSSDCA / NASA Science).
 - **Quests**: nine short mysteries, three per chapter (one main quest with 5 clues and two side quests with 3 clues). Each clue points to a relic; opening the right story card solves it, and finishing a quest shows a short ending and earns a stamp. Any quest can be started at any time. Quests are hidden during the documentary.
 - **Mission log**: every story card has a writing prompt (written for ages 13–17). Answers save automatically in the browser and are collected, with the quest stamps, under **Quests → Mission log**. Nothing is sent anywhere.
+- **Story card tabs**: every relic has **Story**, a four-panel **Comic** (the problem, the clever engineering, the discovery, where it is now), a **Quiz**, and for 16 relics a **Mini game** that plays full screen (land a spacecraft, aim a laser at the mirror, tune a seismometer, assemble a machine, dig for ice or silica, spot hidden things).
+- **Messages between machines**: pick up a message at one relic and deliver it by opening another; both machines' words appear.
+- **Timeline challenge**: put six relics in date order (button on the timeline bar).
+- **Ranks and badges**: ranks rise with relics found (Visitor to Keeper of the Relics); ten badges for quizzes, mini games, messages, quests, the timeline and the mission log, under **Quests → Badges**.
+- Comics, quizzes, mini games and messages for the Moon and Mars are adapted from the author's own *ECHO's Lost Memories*; Surveyor 1 and the deep-space probes have new content. None of it appears during the documentary.
 - **Relic inventory** (searchable), **explorer progress** (saved in the browser) and a **relic timeline** from 1966 to 2021.
 
 ## Run locally
@@ -41,6 +46,8 @@ Push to GitHub and enable **Settings → Pages → Deploy from branch** at the r
 | `js/shapes.js` / `js/shards.js` | Low-poly portraits and the triangle morph engine |
 | `js/data.js` | All relic content and sources |
 | `js/learn.js` | Mission log prompts and quest clues |
+| `js/extras.js` | Comics, quizzes, mini game settings, messages and ranks |
+| `js/games.js` | The mini games |
 | `vendor/` | Three.js r160 + OrbitControls (vendored, MIT) |
 
 Terrain and planet textures are procedural. Pin coordinates are real, but the surface maps are stylised and not to scale.

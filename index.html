@@ -133,6 +133,13 @@
         <span class="tag status" id="card-status"></span>
         <span class="tag" id="card-waiting"></span>
       </div>
+      <div class="card-tabs" role="tablist" aria-label="Relic activities" id="card-tabs">
+        <button class="ct" role="tab" data-tab="story" aria-selected="true">Story</button>
+        <button class="ct" role="tab" data-tab="comic" aria-selected="false">Comic</button>
+        <button class="ct" role="tab" data-tab="quiz" aria-selected="false">Quiz</button>
+        <button class="ct" role="tab" data-tab="game" aria-selected="false" id="ct-game">Mini game</button>
+      </div>
+      <div class="pane" data-pane="story">
       <blockquote class="card-narration" id="card-narration"></blockquote>
       <div class="card-did"><span class="did-label">What it did</span><p id="card-did"></p></div>
       <p class="card-story" id="card-story"></p>
@@ -142,6 +149,7 @@
         <span class="dyk-label">Did you know?</span>
         <p id="card-fact"></p>
       </div>
+      <div class="card-msg" id="card-msg" hidden></div>
       <div class="card-log" id="card-log">
         <label class="log-label" for="card-answer">Mission log</label>
         <p class="log-prompt" id="card-prompt"></p>
@@ -149,6 +157,10 @@
         <span class="log-saved" id="log-saved">Saved in this browser</span>
       </div>
       <a class="source" id="card-source" target="_blank" rel="noopener">NASA mission record ↗</a>
+      </div>
+      <div class="pane comic" data-pane="comic" id="card-comic" hidden></div>
+      <div class="pane quiz" data-pane="quiz" id="card-quiz" hidden></div>
+      <div class="pane game-pane" data-pane="game" id="card-game" hidden></div>
     </div>
     <nav class="card-nav">
       <button class="btn ghost" id="card-prev">← Previous</button>
@@ -181,6 +193,7 @@
     <div class="q-tabs" role="tablist">
       <button class="q-tab" role="tab" id="tab-quests" aria-selected="true">Quests</button>
       <button class="q-tab" role="tab" id="tab-log" aria-selected="false">Mission log <span id="log-count"></span></button>
+      <button class="q-tab" role="tab" id="tab-badges" aria-selected="false">Badges</button>
     </div>
     <div class="inv-list" id="q-list"></div>
   </aside>
@@ -200,6 +213,9 @@
 
   <!-- Relic timeline -->
   <nav class="timeline" id="timeline" aria-label="Relic timeline">
+    <button class="tl-sort" id="tl-sort" aria-label="Put the relics in order: a timeline game">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11M4 12h7M4 17h13M18 4v14m0 0l-3-3m3 3l3-3"/></svg><span>Put them in order</span>
+    </button>
     <div class="tl-track" id="tl-track"></div>
   </nav>
 
@@ -253,6 +269,40 @@
         <div><dt>Challenge</dt><dd>NASA Space Apps 2026 · “Abandoned but not Forgotten”</dd></div>
       </dl>
       <p class="ep-credit credit-line">Not an official NASA site, and not endorsed by NASA. 3D models are stylised, carry no NASA logos, flags or mission patches, and maps are not to scale.</p>
+    </div>
+  </section>
+
+  <!-- Mini game -->
+  <section class="overlay game-ov" id="game-ov" aria-labelledby="go-title" hidden>
+    <div class="ov-inner">
+      <div class="ov-head">
+        <div><p class="ch-num" id="go-kicker"></p><h2 id="go-title"></h2></div>
+        <button class="card-close" id="go-close" aria-label="Close the mini game">×</button>
+      </div>
+      <p class="go-how" id="go-how"></p>
+      <div class="stage" id="go-stage"></div>
+      <div class="game-bar">
+        <span class="status" id="go-status" aria-live="polite"></span>
+        <button class="btn ghost" id="go-reset">↺ Restart</button>
+        <button class="btn primary" id="go-done" hidden>Back to the story <span aria-hidden="true">→</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Timeline sorting -->
+  <section class="overlay sort-ov" id="sort-ov" aria-labelledby="so-title" hidden>
+    <div class="ov-inner">
+      <div class="ov-head">
+        <div><p class="ch-num">Timeline challenge</p><h2 id="so-title">Put them in order</h2></div>
+        <button class="card-close" id="so-close" aria-label="Close">×</button>
+      </div>
+      <p class="go-how">Arrange these relics from the oldest (left) to the newest (right). Use the arrows to move them.</p>
+      <ol class="sort-row" id="sort-row"></ol>
+      <div class="game-bar">
+        <span class="status" id="sort-status" aria-live="polite"></span>
+        <button class="btn ghost" id="sort-new">↻ New set</button>
+        <button class="btn primary" id="sort-check">Check my order</button>
+      </div>
     </div>
   </section>
 
