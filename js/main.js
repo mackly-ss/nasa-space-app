@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SolarView } from './solar.js';
 import { SurfaceView } from './surface.js';
-import { RELICS, WORLDS, byId, forWorld, formatCoord } from './data.js';
+import { RELICS, WORLDS, PROLOGUE, EPILOGUE, byId, forWorld, formatCoord } from './data.js';
 import { Shards } from './shards.js';
 import { SHAPE_FOR } from './shapes.js';
 
@@ -69,7 +69,7 @@ function discover(id) {
   saveFound();
   updateProgress();
   const r = byId(id);
-  if (found.size === RELICS.length) toast(`All ${RELICS.length} relics found! You are an official space archaeologist. 🏅`, 6000);
+  if (found.size === RELICS.length) toast(`All ${RELICS.length} relics found. You are an official space archaeologist. <a href="#epilogue">Read the epilogue →</a>`, 9000);
   else toast(`Relic discovered: <b>${r.name}</b> · ${found.size}/${RELICS.length}`);
   $('progress-btn').classList.remove('pulse'); void $('progress-btn').offsetWidth; $('progress-btn').classList.add('pulse');
   renderInventory();
@@ -80,6 +80,7 @@ let toastTimer;
 function toast(html, ms = 3200) {
   const t = $('toast');
   t.innerHTML = html;
+  t.classList.toggle('action', /<a /.test(html));
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), ms);
@@ -124,7 +125,7 @@ function activate(v) {
 
 function showWorldTitle(world) {
   const w = WORLDS[world];
-  $('world-kicker').textContent = `${forWorld(world).length} relics on this map · not to scale`;
+  $('world-kicker').textContent = `Chapter ${w.chapter} · ${w.title} · ${forWorld(world).length} relics · not to scale`;
   $('world-name').textContent = w.name;
   $('world-blurb').textContent = w.blurb;
   const el = $('world-title');
@@ -169,6 +170,7 @@ async function goWorld(world) {
   if (view === world) return getSurface(world);
   if (view === 'intro') { await hideIntro(); setBodyView('system'); activate(solar); solar.controls.autoRotate = false; }
   closeCard();
+  if (!tour.on && !seenChapters.has(world)) await showChapter(world, { wait: true });
   if (view === 'system') {
     solar.paused = true;
     await solar.flyTo(world, 0.6, 1400);
@@ -195,12 +197,21 @@ async function route() {
   try {
     const [a, b] = parseHash();
     closeInventory();
-    if (!a) {
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (tour.on && h !== tour.expect) pauseTour(true);
+    if (a !== 'epilogue') hideEpilogue();
+    if (a === 'epilogue') {
+      if (tour.on) endTour();
+      if (view === 'intro') await goSystem();
+      closeCard();
+      showEpilogue();
+    } else if (!a) {
       if (view !== 'intro') { setBodyView('intro'); closeCard(); activate(solar); solar.setActive(false); showIntro(); solar.flyHome(1200); }
     } else if (a === 'system') {
       await goSystem(b);
       if (b && byId(b)?.world === 'deep') {
         const r = byId(b);
+        if (!tour.on && !seenChapters.has('deep')) await showChapter('deep', { wait: true });
         await solar.flyTo(r.body, 1.2, 1500);
         openCard(r);
       }
@@ -240,6 +251,256 @@ async function hideIntro() {
   el.hidden = true;
 }
 $('begin').addEventListener('click', () => { go('system'); });
+$('watch').addEventListener('click', () => startTour(0));
+
+const COLD_KEY = 'anf-coldopen-v1';
+let coldToken = 0;
+async function playColdOpen() {
+  const tok = ++coldToken;
+  const intro = $('intro'), co = $('coldopen'), line = $('co-line');
+  intro.classList.add('cold');
+  co.hidden = false; co.classList.remove('done');
+  const alive = () => tok === coldToken;
+  await sleep(700);
+  for (const text of PROLOGUE) {
+    if (!alive()) return;
+    line.innerHTML = text.replace('not forgotten', '<em>not forgotten</em>');
+    line.classList.add('on');
+    await sleep(1300 + text.split(' ').length * 230);
+    if (!alive()) return;
+    line.classList.remove('on');
+    await sleep(1000);
+  }
+  if (alive()) endColdOpen();
+}
+function endColdOpen() {
+  coldToken++;
+  const co = $('coldopen');
+  if (co.classList.contains('done')) return;
+  co.classList.add('done');
+  $('co-line').classList.remove('on');
+  $('intro').classList.remove('cold');
+  try { localStorage.setItem(COLD_KEY, '1'); } catch { /* private mode */ }
+  introArt.gather('lander', { duration: 1400, stagger: 1100 });
+  setTimeout(() => $('watch').focus({ preventScroll: true }), 900);
+}
+$('co-skip').addEventListener('click', endColdOpen);
+$('co-replay').addEventListener('click', playColdOpen);
+
+/* ---------------- Chapter title cards ---------------- */
+const CH_KEY = 'anf-chapters-v1';
+const seenChapters = new Set((() => { try { return JSON.parse(localStorage.getItem(CH_KEY)) || []; } catch { return []; } })());
+let chapterResolve = null;
+function showChapter(world, { wait = false } = {}) {
+  const w = WORLDS[world], el = $('chapter');
+  seenChapters.add(world);
+  try { localStorage.setItem(CH_KEY, JSON.stringify([...seenChapters])); } catch { /* private mode */ }
+  $('ch-num').textContent = `Chapter ${w.chapter}`;
+  $('ch-title').textContent = w.title;
+  $('ch-span').textContent = `${w.name} · ${w.span}`;
+  $('ch-text').innerHTML = w.narration.map((p, i) => `<p style="transition-delay:${0.5 + i * 0.9}s">${p}</p>`).join('');
+  el.className = `chapter ${world}`;
+  el.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
+  if (!tour.on) setTimeout(() => $('ch-continue').focus({ preventScroll: true }), 400);
+  return wait ? new Promise((r) => { chapterResolve = r; }) : Promise.resolve();
+}
+function hideChapter() {
+  const el = $('chapter');
+  if (el.hidden) return;
+  el.classList.remove('open');
+  setTimeout(() => { if (!el.classList.contains('open')) el.hidden = true; }, 900);
+  if (chapterResolve) { const r = chapterResolve; chapterResolve = null; r(); }
+}
+$('ch-continue').addEventListener('click', hideChapter);
+
+/* ---------------- Epilogue ---------------- */
+function showEpilogue() {
+  const el = $('epilogue');
+  $('ep-title').textContent = EPILOGUE.title;
+  $('ep-text').innerHTML = EPILOGUE.paragraphs.map((p, i) => `<p style="transition-delay:${0.3 + i * 0.5}s">${p}</p>`).join('');
+  const yrs = new Date().getFullYear() - Math.min(...RELICS.map((r) => r.year));
+  const stats = [
+    [RELICS.length, 'relics on this map, and hundreds more objects'],
+    [yrs, 'years since the first one arrived'],
+    [12, 'people have walked on the Moon'],
+    [0, 'people have walked on Mars. Yet.'],
+  ];
+  $('ep-stats').innerHTML = stats.map(([n, t]) => `<div><dt>${n}</dt><dd>${t}</dd></div>`).join('');
+  $('ep-closing').innerHTML = `${EPILOGUE.closing[0]}<br><em>${EPILOGUE.closing[1]}</em>`;
+  el.hidden = false;
+  el.scrollTop = 0;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
+}
+function hideEpilogue() {
+  const el = $('epilogue');
+  if (el.hidden) return;
+  el.classList.remove('open');
+  setTimeout(() => { if (!el.classList.contains('open')) el.hidden = true; }, 900);
+}
+$('ep-explore').addEventListener('click', () => go('system'));
+$('ep-again').addEventListener('click', () => { hideEpilogue(); startTour(0); });
+
+/* ---------------- Documentary mode ---------------- */
+const TOUR = [];
+for (const w of ['moon', 'mars', 'deep']) {
+  TOUR.push({ kind: 'chapter', world: w });
+  for (const r of [...forWorld(w)].sort((a, b) => a.year - b.year)) TOUR.push({ kind: 'relic', id: r.id, world: w });
+}
+TOUR.push({ kind: 'epilogue' });
+
+const tour = { on: false, i: 0, token: 0, playing: false, manual: false, expect: null, elapsed: 0, dur: Infinity, speaking: false, voice: false, text: '' };
+const hashFor = (r) => (r.world === 'deep' ? 'system' : r.world) + '-' + r.id;
+const words = (t) => t.split(/\s+/).length;
+
+async function navigate(h) {
+  tour.expect = h;
+  if (decodeURIComponent(location.hash.slice(1)) !== h) location.hash = h;
+  await sleep(60);
+  while (busy || pending !== null) await sleep(80);
+}
+
+function tourUI() {
+  const el = $('tour'), st = TOUR[tour.i];
+  el.classList.toggle('paused', !tour.playing);
+  el.classList.toggle('manual', tour.manual);
+  $('tour-play').setAttribute('aria-label', tour.playing ? 'Pause' : 'Play');
+  const w = st.world ? WORLDS[st.world] : null;
+  $('tour-chapter').textContent = w ? `Chapter ${w.chapter} · ${w.title}` : 'Epilogue';
+  $('tour-count').textContent = `${tour.i + 1} / ${TOUR.length}`;
+}
+
+function setTourText(text, compact = false) {
+  const t = $('tour-text');
+  $('tour').classList.toggle('compact', compact);
+  t.classList.add('fade');
+  setTimeout(() => { t.textContent = text; t.classList.remove('fade'); }, 250);
+}
+
+// Start the clock for a scene. Reading time scales with the words on screen.
+function beginScene(spoken, readWords) {
+  tour.elapsed = 0;
+  tour.dur = Math.min(34000, Math.max(9000, 4000 + readWords * 260));
+  tour.text = spoken;
+  if (tour.voice && tour.playing) speak(spoken);
+}
+
+let voicePick = null;
+function pickVoice() {
+  if (voicePick) return voicePick;
+  const vs = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+  const pref = [/Daniel/, /Google UK English Male/, /en-GB/i, /Google US English/, /Samantha/];
+  for (const p of pref) { const v = vs.find((x) => p.test(x.name) || p.test(x.lang)); if (v) return (voicePick = v); }
+  return (voicePick = vs[0] || null);
+}
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const parts = text.match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g) || [text];
+  const tok = tour.token;
+  tour.speaking = true;
+  parts.forEach((p, k) => {
+    const u = new SpeechSynthesisUtterance(p.trim());
+    u.rate = 0.93; u.pitch = 0.95;
+    const v = pickVoice(); if (v) u.voice = v;
+    if (k === parts.length - 1) u.onend = () => { if (tok === tour.token) { tour.speaking = false; tour.dur = Math.min(tour.dur, tour.elapsed + 1400); } };
+    speechSynthesis.speak(u);
+  });
+}
+function stopSpeech() {
+  tour.speaking = false;
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+}
+
+async function runStep(i) {
+  const tok = ++tour.token;
+  tour.i = Math.max(0, Math.min(TOUR.length - 1, i));
+  tour.manual = false;
+  tour.playing = true;
+  tour.dur = Infinity;
+  tour.elapsed = 0;
+  stopSpeech();
+  tourUI();
+  $('tour-bar').style.width = '0%';
+  const st = TOUR[tour.i];
+  if (st.kind === 'chapter') {
+    const w = WORLDS[st.world];
+    setTourText(w.title, true);
+    showChapter(st.world);
+    beginScene(`Chapter ${w.chapter}. ${w.title}. ${w.narration.join(' ')}`, words(w.narration.join(' ')));
+  } else if (st.kind === 'relic') {
+    const r = byId(st.id);
+    hideChapter();
+    setTourText(r.narration);
+    await navigate(hashFor(r));
+    if (tok !== tour.token) return;
+    beginScene(`${r.narration} ${r.story}`, words(r.narration + ' ' + r.story));
+  } else {
+    hideChapter();
+    endTour();
+    location.hash = 'epilogue';
+  }
+}
+
+function startTour(i = 0) {
+  tour.on = true;
+  document.body.classList.add('touring');
+  $('tour').hidden = false;
+  if (view === 'intro') { endColdOpen(); tour.expect = 'system'; location.hash = 'system'; }
+  runStep(i);
+}
+function endTour() {
+  tour.on = false; tour.playing = false; tour.token++;
+  stopSpeech();
+  document.body.classList.remove('touring');
+  $('tour').hidden = true;
+  hideChapter();
+}
+function pauseTour(manual = false) {
+  tour.playing = false;
+  tour.manual = manual;
+  if ('speechSynthesis' in window) speechSynthesis.pause();
+  if (manual) stopSpeech();
+  tourUI();
+}
+function resumeTour() {
+  if (tour.manual) { runStep(tour.i); return; }
+  tour.playing = true;
+  if ('speechSynthesis' in window) {
+    if (tour.speaking) speechSynthesis.resume();
+    else if (tour.voice && tour.elapsed < 500) speak(tour.text);
+  }
+  tourUI();
+}
+
+setInterval(() => {
+  if (!tour.on || !tour.playing || tour.dur === Infinity) return;
+  tour.elapsed += 100;
+  const waitingForVoice = tour.voice && tour.speaking;
+  const p = Math.min(1, tour.elapsed / tour.dur);
+  $('tour-bar').style.width = (waitingForVoice ? Math.min(p, 0.97) : p) * 100 + '%';
+  if (tour.elapsed >= tour.dur && !waitingForVoice) runStep(tour.i + 1);
+}, 100);
+
+$('tour-play').addEventListener('click', () => (tour.playing ? pauseTour() : resumeTour()));
+$('tour-next').addEventListener('click', () => runStep(tour.i + 1));
+$('tour-prev').addEventListener('click', () => runStep(tour.elapsed > 4000 && !tour.manual ? tour.i : tour.i - 1));
+$('tour-exit').addEventListener('click', endTour);
+if (!('speechSynthesis' in window)) $('tour-voice').hidden = true;
+$('tour-voice').addEventListener('click', () => {
+  tour.voice = !tour.voice;
+  const b = $('tour-voice');
+  b.setAttribute('aria-pressed', String(tour.voice));
+  b.setAttribute('aria-label', tour.voice ? 'Narrator voice on' : 'Narrator voice off');
+  if (tour.voice && tour.playing && tour.dur !== Infinity) { speak(tour.text); tour.dur = Math.max(tour.dur, tour.elapsed + 2000); }
+  else stopSpeech();
+});
+$('story-btn').addEventListener('click', () => {
+  let i = 0;
+  if (cardRelic) i = TOUR.findIndex((s) => s.id === cardRelic.id);
+  else if (view === 'moon' || view === 'mars') i = TOUR.findIndex((s) => s.kind === 'chapter' && s.world === view);
+  startTour(Math.max(0, i));
+});
 
 /* ---------------- Story card ---------------- */
 let cardRelic = null;
@@ -252,6 +513,9 @@ function openCard(r) {
   $('card-status').textContent = r.status;
   $('card-coord').textContent = r.lat !== undefined ? formatCoord(r.lat, r.lon) : 'Deep space';
   $('card-coord').hidden = false;
+  $('card-narration').textContent = r.narration || '';
+  const yrs = new Date().getFullYear() - r.year;
+  $('card-waiting').textContent = r.world === 'deep' ? `${yrs} years out there` : `Waiting ${yrs} years`;
   $('card-story').textContent = r.story;
   $('card-left').innerHTML = r.left.map((x) => `<li>${x}</li>`).join('');
   $('card-fact').textContent = r.fact;
@@ -336,7 +600,9 @@ $('map-btn').addEventListener('click', () => { go('system'); });
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (!$('inventory').hidden) closeInventory();
+    if (!$('coldopen').classList.contains('done') && view === 'intro') endColdOpen();
+    else if (chapterResolve) hideChapter();
+    else if (!$('inventory').hidden) closeInventory();
     else if (cardRelic) $('card-close').click();
   }
 });
@@ -425,7 +691,13 @@ solar.setActive(false);
 updateProgress();
 updateTimeline();
 loop();
-if (!parseHash()[0]) introArt.gather('lander', { duration: 1400, stagger: 1100 });
+if (!parseHash()[0]) {
+  let seen = false;
+  try { seen = !!localStorage.getItem(COLD_KEY); } catch { /* private mode */ }
+  if (seen) endColdOpen(); else playColdOpen();
+} else {
+  $('coldopen').classList.add('done');
+}
 $('loading').textContent = '';
 $('begin').disabled = false;
 if (parseHash()[0]) route();

@@ -4,6 +4,8 @@ An interactive 3D storytelling site about the machines NASA left behind on the M
 
 ## Experience
 
+- **Documentary narrative**: a cold open, three chapters (*I · The Shore* on the Moon, *II · The Long Shift* on Mars, *III · The Drift* in deep space) and an epilogue, *What We Leave Behind*. Every relic opens with a narrated line.
+- **Watch the documentary**: a guided, auto-playing tour (about 9 min) that flies to each relic in order. It has play/pause, skip, an optional narrator voice (browser speech) and a progress bar, and you can take over at any time.
 - **Intro**: a low-poly lunar module that shatters into the solar system.
 - **Solar system**: the Sun, Earth, Moon, Mars, Ceres and Eros, plus Kepler trailing Earth and Pioneer 10/11 drifting outward. Drag to orbit and scroll to zoom.
 - **Surface maps**: click the Moon or Mars to land on a free-roam painterly 3D terrain. Pins show real landing coordinates. Use the altitude slider on the left and the **MAP** button to return.
@@ -39,3 +41,7 @@ Push to GitHub and enable **Settings → Pages → Deploy from branch** at the r
 | `vendor/` | Three.js r160 + OrbitControls (vendored, MIT) |
 
 Terrain and planet textures are procedural. Pin coordinates are real, but the surface maps are stylised and not to scale.
+
+## Credits
+
+Mission data courtesy of NASA: [NSSDCA](https://nssdc.gsfc.nasa.gov/) and [NASA Science](https://science.nasa.gov/). Made for the NASA International Space Apps Challenge 2026. Not an official NASA site, and not endorsed by NASA. The acknowledgment appears as visible text (opening screen, inventory, epilogue) and in the page metadata (`<meta name="credits">`, `dcterms.source`, `dcterms.rights` in `index.html`). 3D rendering by Three.js (MIT).
