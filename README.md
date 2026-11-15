@@ -11,6 +11,8 @@ An interactive 3D storytelling site about the machines NASA left behind on the M
 - **Surface maps**: click the Moon or Mars to land on a free-roam painterly 3D terrain. Pins show real landing coordinates. Use the altitude slider on the left and the **MAP** button to return.
 - **Shard transitions**: inspired by *Species in Pieces*. Triangles gather into a planet portrait, then blow apart to reveal the next world. Story cards morph between low-poly relic portraits.
 - **Story cards**: stories written for ages 13–17, a "Left behind" list, a "Did you know?" fact and a link to the NASA record (NSSDCA / NASA Science).
+- **Quests**: nine short mysteries, three per chapter (one main quest with 5 clues and two side quests with 3 clues). Each clue points to a relic; opening the right story card solves it, and finishing a quest shows a short ending and earns a stamp. Any quest can be started at any time. Quests are hidden during the documentary.
+- **Mission log**: every story card has a writing prompt (written for ages 13–17). Answers save automatically in the browser and are collected, with the quest stamps, under **Quests → Mission log**. Nothing is sent anywhere.
 - **Relic inventory** (searchable), **explorer progress** (saved in the browser) and a **relic timeline** from 1966 to 2021.
 
 ## Run locally
@@ -38,6 +40,7 @@ Push to GitHub and enable **Settings → Pages → Deploy from branch** at the r
 | `js/surface.js` | Procedural Moon/Mars terrain, relic models, pins |
 | `js/shapes.js` / `js/shards.js` | Low-poly portraits and the triangle morph engine |
 | `js/data.js` | All relic content and sources |
+| `js/learn.js` | Mission log prompts and quest clues |
 | `vendor/` | Three.js r160 + OrbitControls (vendored, MIT) |
 
 Terrain and planet textures are procedural. Pin coordinates are real, but the surface maps are stylised and not to scale.
