@@ -325,7 +325,8 @@ body.touring .world-title { display: none; }
   body.touring .toast:not(.action) { display: none; }
   .tour { left: 10px; right: 10px; width: auto; top: 58px; bottom: auto; padding: 10px 12px 6px; }
   .tour-text { font-size: .98rem; }
-  body.touring .card { max-height: 52vh; }
+  body.touring .card { max-height: 36vh; }
+  body.touring .portrait { display: none; }
   .ep-stats { grid-template-columns: repeat(2, 1fr); }
   .co-skip { right: 16px; bottom: 16px; }
   .intro-actions .btn { width: 100%; justify-content: center; }
@@ -351,4 +352,23 @@ body.touring .world-title { display: none; }
 @media (max-width: 820px) {
   .ep-credits { grid-template-columns: 1fr; }
   .ai-mark { right: 8px; bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 2px); font-size: .56rem; }
+}
+
+/* Hosting badge safe zone: Netlify's free plan pins a ~200x64 "Powered by Netlify" badge
+   to the bottom-right corner above everything, so keep controls and credits out of it. */
+:root { --badge-h: 76px; }
+.co-skip { right: auto; left: 24px; }
+.ai-mark { right: auto; left: 12px; }
+.inventory { padding-bottom: 34px; }
+@media (max-width: 820px) {
+  .co-skip { left: 16px; }
+  .ai-mark { left: auto; right: 8px; }
+  /* the watermark gets its own strip above the top bar on phones */
+  .hud-top { padding-top: 24px; }
+  .tour { top: 70px; }
+  .world-title { top: 76px; }
+  .card-nav { padding-bottom: var(--badge-h); }
+  .intro { padding-bottom: calc(var(--badge-h) + 24px); }
+  .inventory { padding-bottom: var(--badge-h); }
+  .epilogue { padding-bottom: calc(var(--badge-h) + 24px); }
 }
