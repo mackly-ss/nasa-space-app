@@ -341,3 +341,14 @@ body.touring .world-title { display: none; }
 .credit-line a:hover { color: var(--accent); border-color: var(--accent); }
 .inv-credit { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
 .ep-credit.credit-line { max-width: none; }
+.ep-credits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; text-align: left; margin: 2.4rem auto 0; max-width: 560px; }
+.ep-credits dt { font-size: .66rem; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+.ep-credits dd { margin: 0; color: var(--ink-2); }
+.ep-credit { margin-top: 1.4rem; }
+
+/* Persistent watermark so screenshots and screen recordings carry the AI disclosure */
+.ai-mark { position: fixed; right: 12px; bottom: 6px; z-index: 70; margin: 0; pointer-events: none; font-size: .62rem; letter-spacing: .08em; color: rgba(255,255,255,.55); text-shadow: 0 1px 3px rgba(0,0,0,.9); background: rgba(4,5,12,.45); padding: 2px 7px; border-radius: 6px; }
+@media (max-width: 820px) {
+  .ep-credits { grid-template-columns: 1fr; }
+  .ai-mark { right: 8px; bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 2px); font-size: .56rem; }
+}

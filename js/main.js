@@ -170,7 +170,10 @@ async function goWorld(world) {
   if (view === world) return getSurface(world);
   if (view === 'intro') { await hideIntro(); setBodyView('system'); activate(solar); solar.controls.autoRotate = false; }
   closeCard();
-  if (!tour.on && !seenChapters.has(world)) await showChapter(world, { wait: true });
+  if (!tour.on && !seenChapters.has(world)) {
+    await showChapter(world, { wait: true });
+    if (pending !== null) return null; // user went somewhere else meanwhile
+  }
   if (view === 'system') {
     solar.paused = true;
     await solar.flyTo(world, 0.6, 1400);
@@ -211,12 +214,16 @@ async function route() {
       await goSystem(b);
       if (b && byId(b)?.world === 'deep') {
         const r = byId(b);
-        if (!tour.on && !seenChapters.has('deep')) await showChapter('deep', { wait: true });
+        if (!tour.on && !seenChapters.has('deep')) {
+          await showChapter('deep', { wait: true });
+          if (pending !== null) return;
+        }
         await solar.flyTo(r.body, 1.2, 1500);
         openCard(r);
       }
     } else if (a === 'moon' || a === 'mars') {
       const s = await goWorld(a);
+      if (!s) return;
       if (b && byId(b)?.world === a) {
         openCard(byId(b));
         await s.flyToRelic(b);
@@ -234,7 +241,8 @@ async function route() {
     if (pending !== null) { const p = pending; pending = null; if (p !== undefined) route(); }
   }
 }
-window.addEventListener('hashchange', route);
+// Navigating elsewhere while a chapter card waits for "Continue" dismisses it, so the route isn't stuck.
+window.addEventListener('hashchange', () => { if (busy && chapterResolve) hideChapter(); route(); });
 
 /* ---------------- Intro ---------------- */
 function showIntro() {
@@ -444,9 +452,13 @@ function resumeTour() {
   tourUI();
 }
 
+// Scene clock: follows the recording while it plays, then real elapsed time for the gap after it.
+let lastTick = performance.now();
 setInterval(() => {
+  const now = performance.now(), dt = now - lastTick;
+  lastTick = now;
   if (!tour.on || !tour.playing || !tour.ready) return;
-  tour.elapsed = tour.audio && !narr.ended ? narr.currentTime * 1000 : tour.elapsed + 100;
+  tour.elapsed = tour.audio && !narr.ended ? narr.currentTime * 1000 : tour.elapsed + dt;
   $('tour-bar').style.width = Math.min(1, tour.elapsed / tour.dur) * 100 + '%';
   if (tour.elapsed >= tour.dur) runStep(tour.i + 1);
 }, 100);

@@ -520,11 +520,6 @@ function makeModel(type, world) {
         const p = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.08, 10), panel);
         p.position.set(s * 4.4, 3.4, 0); g.add(p);
       }
-    } else {
-      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 4, 0.06), silver);
-      flag.position.set(5, 2, 1); g.add(flag);
-      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.1), new THREE.MeshStandardMaterial({ color: 0xe8e3dc, side: THREE.DoubleSide }));
-      cloth.position.set(5.9, 3.4, 1); g.add(cloth);
     }
   } else if (type === 'rover') {
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.5, 2.6), world === 'mars' ? panel : silver);

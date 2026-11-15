@@ -42,6 +42,22 @@ Push to GitHub and enable **Settings → Pages → Deploy from branch** at the r
 
 Terrain and planet textures are procedural. Pin coordinates are real, but the surface maps are stylised and not to scale.
 
-## Credits
+## Credits & AI disclosure
 
-Mission data courtesy of NASA: [NSSDCA](https://nssdc.gsfc.nasa.gov/) and [NASA Science](https://science.nasa.gov/). Made for the NASA International Space Apps Challenge 2026. Not an official NASA site, and not endorsed by NASA. The acknowledgment appears as visible text (opening screen, inventory, epilogue) and in the page metadata (`<meta name="credits">`, `dcterms.source`, `dcterms.rights` in `index.html`). 3D rendering by Three.js (MIT).
+- **Mission data:** courtesy of NASA, from [NSSDCA](https://nssdc.gsfc.nasa.gov/) and [NASA Science](https://science.nasa.gov/).
+- **Narration:** AI-generated voice (ElevenLabs).
+- **Code, 3D models, illustrations and story text:** generated with AI, using Claude Code (Anthropic).
+- **3D engine:** Three.js (MIT).
+- Made for the NASA International Space Apps Challenge 2026. Not an official NASA site, and not endorsed by NASA. The 3D models carry no NASA logos, flags or mission patches.
+
+Where the disclosure appears:
+
+| Where | What |
+| --- | --- |
+| Opening screen, inventory panel | Visible credit line (NASA data, not endorsed, AI disclosure) |
+| Epilogue | Full credits block |
+| Every screen | Small "AI-generated visuals & narration" watermark (fixed corner), so screenshots and screen recordings carry it |
+| `index.html` `<head>` | `ai-disclosure`, `credits`, `dcterms.source` and `dcterms.rights` meta tags |
+| `audio/*.mp3` | ID3 `comment`: "AI-generated voice (ElevenLabs). Script written with Claude Code (Anthropic)." |
+
+If you export stills or record a demo video, keep the watermark in frame or add your own.
