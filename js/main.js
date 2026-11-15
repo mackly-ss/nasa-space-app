@@ -30,6 +30,15 @@ async function shardTransition(shape, caption, color, swap) {
   c.classList.remove('on', 'reveal');
 }
 
+/* ---------------- Routes: #system, #moon, #mars-ingenuity, #system-dawn ---------------- */
+const go = (view, id) => { location.hash = view + (id ? '-' + id : ''); };
+const goRelic = (r) => go(r.world === 'deep' ? 'system' : r.world, r.id);
+function parseHash() {
+  const h = decodeURIComponent(location.hash.slice(1)).replace(/^\//, '').replace(/\//g, '-');
+  const i = h.indexOf('-');
+  return i < 0 ? [h, ''] : [h.slice(0, i), h.slice(i + 1)];
+}
+
 /* ---------------- Renderer ---------------- */
 const stage = $('stage');
 let renderer;
@@ -79,14 +88,14 @@ function toast(html, ms = 3200) {
 /* ---------------- Views ---------------- */
 const solar = new SolarView(renderer, $('labels'), {
   onSelect: (key, body) => {
-    if (body.world) location.hash = `#/${body.world}`;
-    else if (body.relic) location.hash = `#/system/${body.relic}`;
+    if (body.world) go(body.world);
+    else if (body.relic) go('system', body.relic);
   },
 });
 const surfaces = {};
 function getSurface(world) {
   if (!surfaces[world]) {
-    const s = new SurfaceView(world, renderer, $('pins'), { onSelect: (id) => { location.hash = `#/${world}/${id}`; } });
+    const s = new SurfaceView(world, renderer, $('pins'), { onSelect: (id) => go(world, id) });
     s.onControlsChange = () => syncHud();
     s.resize(window.innerWidth, window.innerHeight);
     s.markDiscovered(found);
@@ -96,6 +105,7 @@ function getSurface(world) {
 }
 
 let view = 'intro';       // intro | system | moon | mars
+document.body.dataset.view = 'intro';
 let active = solar;       // the view being rendered
 
 function setBodyView(v) { view = v; document.body.dataset.view = v; }
@@ -183,7 +193,7 @@ async function route() {
   if (busy) { pending = location.hash; return; }
   busy = true;
   try {
-    const [, a, b] = (location.hash || '#/').replace(/^#\/?/, '#/').split('/');
+    const [a, b] = parseHash();
     closeInventory();
     if (!a) {
       if (view !== 'intro') { setBodyView('intro'); closeCard(); activate(solar); solar.setActive(false); showIntro(); solar.flyHome(1200); }
@@ -206,7 +216,7 @@ async function route() {
         syncHud();
       }
     } else {
-      location.replace('#/system');
+      location.replace('#system');
     }
   } finally {
     busy = false;
@@ -229,7 +239,7 @@ async function hideIntro() {
   await introArt.explode({ power: 1.8, duration: 1000 });
   el.hidden = true;
 }
-$('begin').addEventListener('click', () => { location.hash = '#/system'; });
+$('begin').addEventListener('click', () => { go('system'); });
 
 /* ---------------- Story card ---------------- */
 let cardRelic = null;
@@ -270,11 +280,11 @@ function stepCard(dir) {
   const list = forWorld(cardRelic.world);
   const i = list.findIndex((x) => x.id === cardRelic.id);
   const next = list[(i + dir + list.length) % list.length];
-  location.hash = next.world === 'deep' ? `#/system/${next.id}` : `#/${next.world}/${next.id}`;
+  goRelic(next);
 }
 $('card-close').addEventListener('click', () => {
-  const [, a] = location.hash.replace(/^#\/?/, '#/').split('/');
-  location.hash = a === 'moon' || a === 'mars' ? `#/${a}` : '#/system';
+  const [a] = parseHash();
+  go(a === 'moon' || a === 'mars' ? a : 'system');
 });
 $('card-prev').addEventListener('click', () => stepCard(-1));
 $('card-next').addEventListener('click', () => stepCard(1));
@@ -320,9 +330,9 @@ $('inv-list').addEventListener('click', (e) => {
   if (!b) return;
   const r = byId(b.dataset.id);
   closeInventory();
-  location.hash = r.world === 'deep' ? `#/system/${r.id}` : `#/${r.world}/${r.id}`;
+  goRelic(r);
 });
-$('map-btn').addEventListener('click', () => { location.hash = '#/system'; });
+$('map-btn').addEventListener('click', () => { go('system'); });
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
@@ -353,7 +363,7 @@ $('tl-track').addEventListener('click', (e) => {
   const b = e.target.closest('.tl-item');
   if (!b) return;
   const r = byId(b.dataset.id);
-  location.hash = r.world === 'deep' ? `#/system/${r.id}` : `#/${r.world}/${r.id}`;
+  goRelic(r);
 });
 buildTimeline();
 const tlFloat = Object.assign(document.createElement('div'), { className: 'tl-float' });
@@ -415,7 +425,7 @@ solar.setActive(false);
 updateProgress();
 updateTimeline();
 loop();
-if (!location.hash || location.hash === '#/' || location.hash === '#') introArt.gather('lander', { duration: 1400, stagger: 1100 });
+if (!parseHash()[0]) introArt.gather('lander', { duration: 1400, stagger: 1100 });
 $('loading').textContent = '';
 $('begin').disabled = false;
-if (location.hash && location.hash !== '#/' && location.hash !== '#') route();
+if (parseHash()[0]) route();
