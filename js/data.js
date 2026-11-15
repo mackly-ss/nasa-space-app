@@ -291,3 +291,26 @@ export function formatCoord(lat, lon) {
   const lo = `${Math.abs(lon).toFixed(2)}° ${lon >= 0 ? 'E' : 'W'}`;
   return `${la}  ${lo}`;
 }
+
+// The documentary cut: 9 scenes, ~3 minutes. `text` is the voiceover script, shown as subtitles.
+// Recorded narration goes in audio/<id>.mp3 (see audio/README.md). Without it, scenes run on a reading timer.
+export const DOCUMENTARY = [
+  { id: 'ch1-moon', kind: 'chapter', world: 'moon',
+    text: 'Chapter One. The Shore. For six and a half years, the Moon was a place we went. Twelve people walked on it. Every crew left the same way: lifting off in the top half of their spacecraft, and leaving the bottom half behind in the dust. Nothing up there rusts. Nothing rots.' },
+  { id: 'apollo-11', kind: 'relic', relic: 'apollo-11', world: 'moon',
+    text: 'July 20, 1969. Neil Armstrong and Buzz Aldrin spent about two and a half hours outside. When they left, the lower half of their lander, Eagle, stayed behind as a launch pad. It is still there, with a plaque on its leg: "We came in peace for all mankind."' },
+  { id: 'apollo-17', kind: 'relic', relic: 'apollo-17', world: 'moon',
+    text: 'December 1972. The last crew drove their rover thirty-six kilometres, and fixed a broken fender with maps and duct tape. Before climbing aboard, Gene Cernan said: "We leave as we came and, God willing, as we shall return." No one has stood on the Moon since.' },
+  { id: 'ch2-mars', kind: 'chapter', world: 'mars',
+    text: 'Chapter Two. The Long Shift. No one has ever stood on Mars. Everything there was built to work alone, so far away that a message takes minutes to arrive. Again and again, these machines were promised a few months of life. Again and again, they refused to stop.' },
+  { id: 'opportunity', kind: 'relic', relic: 'opportunity', world: 'mars',
+    text: 'Opportunity was built to last ninety days. It lasted more than fourteen years, and drove farther than a marathon. Then, in 2018, a dust storm swallowed the planet and blotted out the Sun. Engineers sent more than a thousand messages. None was ever answered.' },
+  { id: 'ingenuity', kind: 'relic', relic: 'ingenuity', world: 'mars',
+    text: 'April 2021. For thirty-nine seconds, something flew on another planet. Ingenuity was meant to try five short hops. It flew seventy-two times. Tucked beneath its solar panel is a scrap of fabric from the Wright brothers\' first airplane.' },
+  { id: 'ch3-deep', kind: 'chapter', world: 'deep',
+    text: 'Chapter Three. The Drift. Not everything we send comes to rest on a world. Some spacecraft circle silent places in the asteroid belt. Two are leaving the Sun behind forever. No one will ever bring them home. They were built knowing that.' },
+  { id: 'pioneer-10', kind: 'relic', relic: 'pioneer-10', world: 'deep',
+    text: 'Pioneer 10 was the first spacecraft to cross the asteroid belt and fly past Jupiter. Its last faint signal reached Earth in 2003. Bolted to its frame is a plaque: a picture of two people, and a map of where they live. Just in case.' },
+  { id: 'epilogue', kind: 'epilogue',
+    text: 'Archaeologists learn about people from what they leave behind. Out here, every object is a moment frozen in place: a plaque, two golf balls, a family photograph in the grey dust. One day, someone may kneel beside Opportunity and brush the dust from its solar panels. Until then, they wait exactly where we left them. Abandoned. Not forgotten.' },
+];

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SolarView } from './solar.js';
 import { SurfaceView } from './surface.js';
-import { RELICS, WORLDS, PROLOGUE, EPILOGUE, byId, forWorld, formatCoord } from './data.js';
+import { RELICS, WORLDS, PROLOGUE, EPILOGUE, DOCUMENTARY, byId, forWorld, formatCoord } from './data.js';
 import { Shards } from './shards.js';
 import { SHAPE_FOR } from './shapes.js';
 
@@ -335,6 +335,7 @@ function showEpilogue() {
 function hideEpilogue() {
   const el = $('epilogue');
   if (el.hidden) return;
+  if (!tour.on) stopNarration();
   el.classList.remove('open');
   setTimeout(() => { if (!el.classList.contains('open')) el.hidden = true; }, 900);
 }
@@ -342,16 +343,27 @@ $('ep-explore').addEventListener('click', () => go('system'));
 $('ep-again').addEventListener('click', () => { hideEpilogue(); startTour(0); });
 
 /* ---------------- Documentary mode ---------------- */
-const TOUR = [];
-for (const w of ['moon', 'mars', 'deep']) {
-  TOUR.push({ kind: 'chapter', world: w });
-  for (const r of [...forWorld(w)].sort((a, b) => a.year - b.year)) TOUR.push({ kind: 'relic', id: r.id, world: w });
-}
-TOUR.push({ kind: 'epilogue' });
-
-const tour = { on: false, i: 0, token: 0, playing: false, manual: false, expect: null, elapsed: 0, dur: Infinity, speaking: false, voice: false, text: '' };
+// A ~3 minute cut (DOCUMENTARY in data.js). Each scene plays audio/<id>.mp3 if it exists;
+// otherwise it runs on a reading timer. The audio clock drives scene length when present.
+const TOUR = DOCUMENTARY;
+const tour = { on: false, i: 0, token: 0, playing: false, manual: false, expect: null, elapsed: 0, dur: Infinity, ready: false, audio: false, voice: true };
 const hashFor = (r) => (r.world === 'deep' ? 'system' : r.world) + '-' + r.id;
 const words = (t) => t.split(/\s+/).length;
+
+const narr = new Audio();
+narr.preload = 'auto';
+narr.addEventListener('loadedmetadata', () => {
+  if (narr.dataset.token !== String(tour.token) || !isFinite(narr.duration)) return;
+  tour.audio = true;
+  tour.dur = narr.duration * 1000 + 1500;
+});
+function playNarration(id) {
+  narr.dataset.token = String(tour.token);
+  narr.src = `audio/${id}.mp3`;
+  narr.muted = !tour.voice;
+  narr.play().catch(() => { /* missing file or blocked autoplay: timer mode */ });
+}
+function stopNarration() { narr.pause(); narr.removeAttribute('src'); narr.load(); }
 
 async function navigate(h) {
   tour.expect = h;
@@ -377,69 +389,32 @@ function setTourText(text, compact = false) {
   setTimeout(() => { t.textContent = text; t.classList.remove('fade'); }, 250);
 }
 
-// Start the clock for a scene. Reading time scales with the words on screen.
-function beginScene(spoken, readWords) {
-  tour.elapsed = 0;
-  tour.dur = Math.min(34000, Math.max(9000, 4000 + readWords * 260));
-  tour.text = spoken;
-  if (tour.voice && tour.playing) speak(spoken);
-}
-
-let voicePick = null;
-function pickVoice() {
-  if (voicePick) return voicePick;
-  const vs = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
-  const pref = [/Daniel/, /Google UK English Male/, /en-GB/i, /Google US English/, /Samantha/];
-  for (const p of pref) { const v = vs.find((x) => p.test(x.name) || p.test(x.lang)); if (v) return (voicePick = v); }
-  return (voicePick = vs[0] || null);
-}
-function speak(text) {
-  if (!('speechSynthesis' in window)) return;
-  speechSynthesis.cancel();
-  const parts = text.match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g) || [text];
-  const tok = tour.token;
-  tour.speaking = true;
-  parts.forEach((p, k) => {
-    const u = new SpeechSynthesisUtterance(p.trim());
-    u.rate = 0.93; u.pitch = 0.95;
-    const v = pickVoice(); if (v) u.voice = v;
-    if (k === parts.length - 1) u.onend = () => { if (tok === tour.token) { tour.speaking = false; tour.dur = Math.min(tour.dur, tour.elapsed + 1400); } };
-    speechSynthesis.speak(u);
-  });
-}
-function stopSpeech() {
-  tour.speaking = false;
-  if ('speechSynthesis' in window) speechSynthesis.cancel();
-}
-
 async function runStep(i) {
   const tok = ++tour.token;
   tour.i = Math.max(0, Math.min(TOUR.length - 1, i));
-  tour.manual = false;
-  tour.playing = true;
-  tour.dur = Infinity;
-  tour.elapsed = 0;
-  stopSpeech();
+  Object.assign(tour, { manual: false, playing: true, elapsed: 0, ready: false, audio: false });
+  // Reading pace (~150 wpm) until the recording's real length is known.
+  const st = TOUR[tour.i];
+  tour.dur = 2500 + words(st.text) * 400;
   tourUI();
   $('tour-bar').style.width = '0%';
-  const st = TOUR[tour.i];
-  if (st.kind === 'chapter') {
-    const w = WORLDS[st.world];
-    setTourText(w.title, true);
-    showChapter(st.world);
-    beginScene(`Chapter ${w.chapter}. ${w.title}. ${w.narration.join(' ')}`, words(w.narration.join(' ')));
-  } else if (st.kind === 'relic') {
-    const r = byId(st.id);
-    hideChapter();
-    setTourText(r.narration);
-    await navigate(hashFor(r));
-    if (tok !== tour.token) return;
-    beginScene(`${r.narration} ${r.story}`, words(r.narration + ' ' + r.story));
-  } else {
-    hideChapter();
+  if (st.kind === 'epilogue') {
     endTour();
     location.hash = 'epilogue';
+    playNarration(st.id);
+    return;
   }
+  playNarration(st.id);
+  if (st.kind === 'chapter') {
+    setTourText(st.text, true);
+    showChapter(st.world);
+  } else {
+    hideChapter();
+    setTourText(st.text);
+    await navigate(hashFor(byId(st.relic)));
+    if (tok !== tour.token) return;
+  }
+  tour.ready = true;
 }
 
 function startTour(i = 0) {
@@ -451,7 +426,7 @@ function startTour(i = 0) {
 }
 function endTour() {
   tour.on = false; tour.playing = false; tour.token++;
-  stopSpeech();
+  stopNarration();
   document.body.classList.remove('touring');
   $('tour').hidden = true;
   hideChapter();
@@ -459,47 +434,37 @@ function endTour() {
 function pauseTour(manual = false) {
   tour.playing = false;
   tour.manual = manual;
-  if ('speechSynthesis' in window) speechSynthesis.pause();
-  if (manual) stopSpeech();
+  narr.pause();
   tourUI();
 }
 function resumeTour() {
   if (tour.manual) { runStep(tour.i); return; }
   tour.playing = true;
-  if ('speechSynthesis' in window) {
-    if (tour.speaking) speechSynthesis.resume();
-    else if (tour.voice && tour.elapsed < 500) speak(tour.text);
-  }
+  if (tour.audio && !narr.ended) narr.play().catch(() => {});
   tourUI();
 }
 
 setInterval(() => {
-  if (!tour.on || !tour.playing || tour.dur === Infinity) return;
-  tour.elapsed += 100;
-  const waitingForVoice = tour.voice && tour.speaking;
-  const p = Math.min(1, tour.elapsed / tour.dur);
-  $('tour-bar').style.width = (waitingForVoice ? Math.min(p, 0.97) : p) * 100 + '%';
-  if (tour.elapsed >= tour.dur && !waitingForVoice) runStep(tour.i + 1);
+  if (!tour.on || !tour.playing || !tour.ready) return;
+  tour.elapsed = tour.audio && !narr.ended ? narr.currentTime * 1000 : tour.elapsed + 100;
+  $('tour-bar').style.width = Math.min(1, tour.elapsed / tour.dur) * 100 + '%';
+  if (tour.elapsed >= tour.dur) runStep(tour.i + 1);
 }, 100);
 
 $('tour-play').addEventListener('click', () => (tour.playing ? pauseTour() : resumeTour()));
 $('tour-next').addEventListener('click', () => runStep(tour.i + 1));
 $('tour-prev').addEventListener('click', () => runStep(tour.elapsed > 4000 && !tour.manual ? tour.i : tour.i - 1));
 $('tour-exit').addEventListener('click', endTour);
-if (!('speechSynthesis' in window)) $('tour-voice').hidden = true;
-$('tour-voice').addEventListener('click', () => {
-  tour.voice = !tour.voice;
+function syncVoiceBtn() {
   const b = $('tour-voice');
   b.setAttribute('aria-pressed', String(tour.voice));
-  b.setAttribute('aria-label', tour.voice ? 'Narrator voice on' : 'Narrator voice off');
-  if (tour.voice && tour.playing && tour.dur !== Infinity) { speak(tour.text); tour.dur = Math.max(tour.dur, tour.elapsed + 2000); }
-  else stopSpeech();
-});
+  b.setAttribute('aria-label', tour.voice ? 'Mute narrator' : 'Unmute narrator');
+}
+syncVoiceBtn();
+$('tour-voice').addEventListener('click', () => { tour.voice = !tour.voice; narr.muted = !tour.voice; syncVoiceBtn(); });
 $('story-btn').addEventListener('click', () => {
-  let i = 0;
-  if (cardRelic) i = TOUR.findIndex((s) => s.id === cardRelic.id);
-  else if (view === 'moon' || view === 'mars') i = TOUR.findIndex((s) => s.kind === 'chapter' && s.world === view);
-  startTour(Math.max(0, i));
+  const w = cardRelic ? cardRelic.world : (view === 'moon' || view === 'mars') ? view : null;
+  startTour(w ? Math.max(0, TOUR.findIndex((st) => st.kind === 'chapter' && st.world === w)) : 0);
 });
 
 /* ---------------- Story card ---------------- */

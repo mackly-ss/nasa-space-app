@@ -5,12 +5,12 @@ An interactive 3D storytelling site about the machines NASA left behind on the M
 ## Experience
 
 - **Documentary narrative**: a cold open, three chapters (*I · The Shore* on the Moon, *II · The Long Shift* on Mars, *III · The Drift* in deep space) and an epilogue, *What We Leave Behind*. Every relic opens with a narrated line.
-- **Watch the documentary**: a guided, auto-playing tour (about 9 min) that flies to each relic in order. It has play/pause, skip, an optional narrator voice (browser speech) and a progress bar, and you can take over at any time.
+- **Watch the documentary**: a guided, auto-playing ~3 minute cut (9 scenes: Apollo 11, Apollo 17, Opportunity, Ingenuity and Pioneer 10, plus the chapter cards and epilogue). Subtitles always show; recorded narration plays from `audio/<scene>.mp3` when present (see `audio/README.md`). It has play/pause, skip and mute, and you can take over at any time. The other 15 relics are left to discover in free exploration.
 - **Intro**: a low-poly lunar module that shatters into the solar system.
 - **Solar system**: the Sun, Earth, Moon, Mars, Ceres and Eros, plus Kepler trailing Earth and Pioneer 10/11 drifting outward. Drag to orbit and scroll to zoom.
 - **Surface maps**: click the Moon or Mars to land on a free-roam painterly 3D terrain. Pins show real landing coordinates. Use the altitude slider on the left and the **MAP** button to return.
 - **Shard transitions**: inspired by *Species in Pieces*. Triangles gather into a planet portrait, then blow apart to reveal the next world. Story cards morph between low-poly relic portraits.
-- **Story cards**: friendly, school-age-level stories, a "Left behind" list, a "Did you know?" fact and a link to the NASA record (NSSDCA / NASA Science).
+- **Story cards**: stories written for ages 13–17, a "Left behind" list, a "Did you know?" fact and a link to the NASA record (NSSDCA / NASA Science).
 - **Relic inventory** (searchable), **explorer progress** (saved in the browser) and a **relic timeline** from 1966 to 2021.
 
 ## Run locally
