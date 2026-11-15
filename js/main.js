@@ -4,6 +4,7 @@ import { SurfaceView } from './surface.js';
 import { RELICS, WORLDS, PROLOGUE, EPILOGUE, DOCUMENTARY, byId, forWorld, formatCoord, plainPlace } from './data.js';
 import { Shards } from './shards.js';
 import { SHAPE_FOR } from './shapes.js';
+import { PROMPTS, QUESTS, questById } from './learn.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -109,7 +110,7 @@ let view = 'intro';       // intro | system | moon | mars
 document.body.dataset.view = 'intro';
 let active = solar;       // the view being rendered
 
-function setBodyView(v) { view = v; document.body.dataset.view = v; }
+function setBodyView(v) { view = v; document.body.dataset.view = v; renderTracker(); }
 
 function activate(v) {
   solar.setActive(false);
@@ -203,6 +204,7 @@ async function route() {
   try {
     const [a, b] = parseHash();
     closeInventory();
+    closeQuests();
     const h = decodeURIComponent(location.hash.slice(1));
     if (tour.on && h !== tour.expect) pauseTour(true);
     if (a !== 'epilogue') hideEpilogue();
@@ -508,16 +510,22 @@ function openCard(r) {
   card.hidden = false;
   card.querySelector('.card-scroll').scrollTop = 0;
   requestAnimationFrame(() => card.classList.add('open'));
+  document.body.classList.add('card-open');
   const shape = SHAPE_FOR[r.id];
   if (wasOpen && cardArt.shape) cardArt.morphTo(shape, { duration: 1000, stagger: 600 });
   else cardArt.gather(shape, { duration: 1000, stagger: 600 });
   discover(r.id);
+  $('card-prompt').textContent = PROMPTS[r.id] || '';
+  $('card-answer').value = learn.log[r.id] || '';
+  $('log-saved').textContent = 'Saved automatically in this browser';
+  checkQuest(r);
   updateTimeline();
 }
 function closeCard() {
   cardRelic = null;
   const card = $('card');
   card.classList.remove('open');
+  document.body.classList.remove('card-open');
   setTimeout(() => { if (!card.classList.contains('open')) card.hidden = true; }, 350);
   if (active instanceof SurfaceView) active.selected = null;
   updateTimeline();
@@ -565,12 +573,15 @@ function openInventory() {
 }
 function closeInventory() {
   $('inventory').classList.remove('open'); $('scrim').classList.remove('on');
-  setTimeout(() => { if (!$('inventory').classList.contains('open')) { $('inventory').hidden = true; $('scrim').hidden = true; } }, 300);
+  setTimeout(() => {
+    if (!$('inventory').classList.contains('open')) $('inventory').hidden = true;
+    if (!$('inventory').classList.contains('open') && !$('quests').classList.contains('open')) $('scrim').hidden = true;
+  }, 300);
 }
 $('inventory-btn').addEventListener('click', openInventory);
 $('progress-btn').addEventListener('click', openInventory);
 $('inv-close').addEventListener('click', closeInventory);
-$('scrim').addEventListener('click', closeInventory);
+$('scrim').addEventListener('click', () => { closeInventory(); closeQuests(); });
 $('inv-search').addEventListener('input', renderInventory);
 $('inv-list').addEventListener('click', (e) => {
   const b = e.target.closest('.inv-item');
@@ -585,6 +596,8 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (!$('coldopen').classList.contains('done') && view === 'intro') endColdOpen();
     else if (chapterResolve) hideChapter();
+    else if (!$('quest-end').hidden) hideQuestEnd();
+    else if (!$('quests').hidden) closeQuests();
     else if (!$('inventory').hidden) closeInventory();
     else if (cardRelic) $('card-close').click();
   }
@@ -627,6 +640,191 @@ $('tl-track').addEventListener('pointerover', (e) => {
   tlFloat.classList.add('show');
 });
 $('tl-track').addEventListener('pointerout', () => tlFloat.classList.remove('show'));
+
+/* ---------------- Quests & mission log ---------------- */
+// Free exploration only: hidden and inactive while the documentary plays.
+// Progress and answers are kept in this browser (localStorage), nothing is sent anywhere.
+const LEARN = 'anf-learn-v1';
+const learn = (() => { try { return JSON.parse(localStorage.getItem(LEARN)) || {}; } catch { return {}; } })();
+learn.log ||= {};
+learn.quests ||= {};
+if (learn.active && !questById(learn.active)) learn.active = null;
+const saveLearn = () => { try { localStorage.setItem(LEARN, JSON.stringify(learn)); } catch { /* private mode */ } };
+const progressOf = (q) => learn.quests[q.id] || { step: 0, done: false };
+const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const WORLD_ORDER = ['moon', 'mars', 'deep'];
+const chapterHead = (w) => `<h4>Chapter ${WORLDS[w].chapter} · ${WORLDS[w].name}</h4>`;
+
+function renderTracker() {
+  const q = learn.active && questById(learn.active);
+  document.body.classList.toggle('questing', !!q);
+  const el = $('quest-track');
+  if (!q) { el.hidden = true; return; }
+  const st = progressOf(q), w = WORLDS[q.world], n = q.clues.length;
+  el.hidden = false;
+  $('qt-label').textContent = `${q.main ? 'Main quest' : 'Side quest'} · ${w.name}`;
+  $('qt-title').textContent = q.title;
+  $('qt-clue').innerHTML = `<b>Clue ${st.step + 1} of ${n}</b>${q.clues[st.step][0]}`;
+  $('qt-dots').innerHTML = q.clues.map((_, i) => `<i class="${i < st.step ? 'on' : i === st.step ? 'now' : ''}"></i>`).join('');
+  const here = q.world === 'deep' ? view === 'system' : view === q.world;
+  $('qt-go').textContent = here ? 'All quests' : `Go to ${w.name} →`;
+  $('qt-go').dataset.go = here ? '' : q.world;
+}
+
+function startQuest(id) {
+  const q = questById(id);
+  if (learn.active === id) { closeQuests(); return; }
+  const st = (learn.quests[id] = progressOf(q));
+  if (st.done) Object.assign(st, { step: 0, done: false });
+  learn.active = id;
+  saveLearn();
+  closeQuests();
+  renderTracker();
+  toast(`Quest started: <b>${q.title}</b>`);
+  if (cardRelic) checkQuest(cardRelic); // the first answer may already be open
+}
+
+function stopQuest() {
+  learn.active = null;
+  saveLearn();
+  renderTracker();
+  toast('Quest paused. Pick it up again any time from <b>Quests</b>.');
+}
+
+// Called whenever a story card opens: solves the current clue if this is the right relic.
+function checkQuest(r) {
+  const banner = $('card-quest');
+  banner.hidden = true;
+  const q = learn.active && questById(learn.active);
+  if (!q || tour.on) return;
+  const st = (learn.quests[q.id] = progressOf(q));
+  if (q.clues[st.step][1] !== r.id) return;
+  st.step++;
+  banner.innerHTML = `<b>✓ Clue solved</b> · ${q.title} · ${st.step}/${q.clues.length}`;
+  banner.hidden = false;
+  if (st.step >= q.clues.length) {
+    st.done = true;
+    learn.active = null;
+    saveLearn();
+    renderTracker();
+    setTimeout(() => showQuestEnd(q), 1600);
+  } else {
+    saveLearn();
+    renderTracker();
+    toast('<b>Clue solved ✓</b> Your next clue is ready.');
+    const el = $('quest-track');
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  }
+}
+
+function showQuestEnd(q) {
+  if (tour.on) return;
+  $('qe-kicker').textContent = `Quest complete · ${WORLDS[q.world].name}`;
+  $('qe-title').textContent = q.title;
+  $('qe-text').textContent = q.ending;
+  const el = $('quest-end');
+  el.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('open')));
+  setTimeout(() => $('qe-more').focus({ preventScroll: true }), 400);
+}
+function hideQuestEnd() {
+  const el = $('quest-end');
+  el.classList.remove('open');
+  setTimeout(() => { if (!el.classList.contains('open')) el.hidden = true; }, 600);
+}
+
+/* Quests & log panel */
+let qTab = 'quests';
+function questsHTML() {
+  return `<p class="inv-sub">Solve each clue by finding the right relic and opening its story. Start any quest, any time.</p>` +
+    WORLD_ORDER.map((w) => `<section class="inv-group">${chapterHead(w)}${QUESTS.filter((q) => q.world === w).map((q) => {
+      const st = progressOf(q), n = q.clues.length, active = learn.active === q.id;
+      const status = st.done ? '<span class="q-done">✓ Complete</span>'
+        : active ? `<span class="q-prog">In progress · ${st.step}/${n}</span>`
+        : `<span class="q-prog">${st.step ? `${st.step}/${n} clues` : `${n} clues`}</span>`;
+      const label = active || (st.step && !st.done) ? 'Continue' : st.done ? 'Play again' : 'Start';
+      return `<article class="q-item${st.done ? ' done' : ''}${active ? ' active' : ''}">
+        <div class="q-top"><span class="q-kind">${q.main ? 'Main quest' : 'Side quest'}</span>${status}</div>
+        <h5>${q.title}</h5>
+        <p>${q.intro}</p>
+        <button class="btn ghost q-start" data-q="${q.id}">${label} <span aria-hidden="true">→</span></button>
+      </article>`;
+    }).join('')}</section>`).join('');
+}
+function logHTML() {
+  const done = QUESTS.filter((q) => progressOf(q).done).length;
+  const stamps = QUESTS.map((q) => {
+    const d = progressOf(q).done;
+    return `<li class="${d ? 'on' : ''}"><span aria-hidden="true">${d ? '✓' : ''}</span>${q.title}<small>${d ? 'Complete' : 'Not yet'}</small></li>`;
+  }).join('');
+  return `<p class="inv-sub">Your answers are saved in this browser only. Open a relic's story to write or edit an entry.</p>
+    <h4 class="log-h">Quest stamps <span>${done}/${QUESTS.length}</span></h4>
+    <ul class="q-stamps">${stamps}</ul>` +
+    WORLD_ORDER.map((w) => `<section class="inv-group">${chapterHead(w)}${forWorld(w).map((r) => {
+      const a = (learn.log[r.id] || '').trim();
+      return `<button class="log-item${a ? ' written' : ''}" data-id="${r.id}">
+        <span class="log-name">${r.name}</span>
+        <span class="log-q">${PROMPTS[r.id]}</span>
+        ${a ? `<span class="log-a">${esc(a)}</span>` : '<span class="log-empty">Not written yet. Open the story to write.</span>'}
+      </button>`;
+    }).join('')}</section>`).join('');
+}
+function renderQuests() {
+  $('tab-quests').setAttribute('aria-selected', String(qTab === 'quests'));
+  $('tab-log').setAttribute('aria-selected', String(qTab === 'log'));
+  $('q-title').textContent = qTab === 'quests' ? 'Quests' : 'Mission Log';
+  $('log-count').textContent = `${Object.values(learn.log).filter((t) => t.trim()).length}/${RELICS.length}`;
+  $('q-list').innerHTML = qTab === 'quests' ? questsHTML() : logHTML();
+  $('q-list').scrollTop = 0;
+}
+function openQuests(tab = qTab) {
+  qTab = tab;
+  renderQuests();
+  $('quests').hidden = false; $('scrim').hidden = false;
+  requestAnimationFrame(() => { $('quests').classList.add('open'); $('scrim').classList.add('on'); });
+  setTimeout(() => $(qTab === 'quests' ? 'tab-quests' : 'tab-log').focus({ preventScroll: true }), 50);
+}
+function closeQuests() {
+  const el = $('quests');
+  if (el.hidden) return;
+  el.classList.remove('open');
+  if (!$('inventory').classList.contains('open')) $('scrim').classList.remove('on');
+  setTimeout(() => {
+    if (!el.classList.contains('open')) el.hidden = true;
+    if (!el.classList.contains('open') && !$('inventory').classList.contains('open')) $('scrim').hidden = true;
+  }, 300);
+}
+$('quest-btn').addEventListener('click', () => openQuests());
+$('q-close').addEventListener('click', closeQuests);
+$('tab-quests').addEventListener('click', () => { qTab = 'quests'; renderQuests(); });
+$('tab-log').addEventListener('click', () => { qTab = 'log'; renderQuests(); });
+$('q-list').addEventListener('click', (e) => {
+  const s = e.target.closest('.q-start');
+  if (s) { startQuest(s.dataset.q); return; }
+  const l = e.target.closest('.log-item');
+  if (l) { closeQuests(); goRelic(byId(l.dataset.id)); }
+});
+$('qt-stop').addEventListener('click', stopQuest);
+$('qt-go').addEventListener('click', (e) => {
+  const w = e.currentTarget.dataset.go;
+  if (w) go(w === 'deep' ? 'system' : w);
+  else openQuests('quests');
+});
+$('qe-more').addEventListener('click', () => { hideQuestEnd(); openQuests('quests'); });
+$('qe-close').addEventListener('click', hideQuestEnd);
+
+/* Mission log box on the story card */
+let logTimer;
+$('card-answer').addEventListener('input', (e) => {
+  if (!cardRelic) return;
+  learn.log[cardRelic.id] = e.target.value;
+  $('log-saved').textContent = 'Saving…';
+  clearTimeout(logTimer);
+  logTimer = setTimeout(() => { saveLearn(); $('log-saved').textContent = 'Saved ✓'; }, 400);
+});
+// Keep typing (arrow keys, etc.) from moving the 3D map.
+$('card-answer').addEventListener('keydown', (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
+renderTracker();
 
 /* ---------------- Loop ---------------- */
 function resize() {

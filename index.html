@@ -63,9 +63,13 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
         <span>Documentary</span>
       </button>
+      <button class="chip quest-btn" id="quest-btn" aria-label="Quests and mission log">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>
+        <span>Quests</span>
+      </button>
       <button class="chip" id="progress-btn" aria-label="Relics discovered, open inventory">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg>
-        <span><b id="found-count">0</b>/<span id="total-count">0</span> relics</span>
+        <span><b id="found-count">0</b>/<span id="total-count">0</span><span class="rl"> relics</span></span>
       </button>
       <button class="chip" id="inventory-btn" aria-label="Open relic inventory">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
@@ -101,11 +105,26 @@
     <span>Click the <b>Moon</b> or <b>Mars</b> to land · Click glowing probes for deep-space stories</span>
   </div>
 
+  <!-- Active quest tracker -->
+  <section class="quest-track" id="quest-track" aria-label="Current quest" hidden>
+    <div class="qt-head">
+      <span class="qt-label" id="qt-label"></span>
+      <button class="qt-x" id="qt-stop" aria-label="Stop this quest">×</button>
+    </div>
+    <p class="qt-title" id="qt-title"></p>
+    <p class="qt-clue" id="qt-clue" aria-live="polite"></p>
+    <div class="qt-foot">
+      <span class="qt-dots" id="qt-dots" aria-hidden="true"></span>
+      <button class="qt-go" id="qt-go"></button>
+    </div>
+  </section>
+
   <!-- Story card -->
   <aside class="card" id="card" aria-live="polite" aria-labelledby="card-title" hidden>
     <button class="card-close" id="card-close" aria-label="Close story">×</button>
     <div class="card-scroll">
       <div class="portrait"><svg id="card-art" aria-hidden="true"></svg></div>
+      <p class="card-quest" id="card-quest" hidden></p>
       <p class="eyebrow" id="card-kicker"></p>
       <h3 id="card-title"></h3>
       <p class="card-place" id="card-place"></p>
@@ -122,6 +141,12 @@
       <div class="dyk">
         <span class="dyk-label">Did you know?</span>
         <p id="card-fact"></p>
+      </div>
+      <div class="card-log" id="card-log">
+        <label class="log-label" for="card-answer">Mission log</label>
+        <p class="log-prompt" id="card-prompt"></p>
+        <textarea id="card-answer" rows="4" placeholder="Write your answer here…"></textarea>
+        <span class="log-saved" id="log-saved">Saved in this browser</span>
       </div>
       <a class="source" id="card-source" target="_blank" rel="noopener">NASA mission record ↗</a>
     </div>
@@ -146,6 +171,32 @@
     <p class="credit-line inv-credit">Mission data courtesy of <a href="https://nssdc.gsfc.nasa.gov/" target="_blank" rel="noopener">NASA NSSDCA</a> and <a href="https://science.nasa.gov/" target="_blank" rel="noopener">NASA Science</a>. Made for the NASA Space Apps Challenge 2026. Not an official NASA site, and not endorsed by NASA. Made with AI: code, 3D models, illustrations and story text generated with Claude Code (Anthropic); narration is an AI-generated voice (ElevenLabs). 3D engine: Three.js (MIT).</p>
   </aside>
   <div class="scrim" id="scrim" hidden></div>
+
+  <!-- Quests & mission log -->
+  <aside class="inventory quests" id="quests" aria-labelledby="q-title" hidden>
+    <div class="inv-head">
+      <h3 id="q-title">Quests</h3>
+      <button class="card-close" id="q-close" aria-label="Close quests">×</button>
+    </div>
+    <div class="q-tabs" role="tablist">
+      <button class="q-tab" role="tab" id="tab-quests" aria-selected="true">Quests</button>
+      <button class="q-tab" role="tab" id="tab-log" aria-selected="false">Mission log <span id="log-count"></span></button>
+    </div>
+    <div class="inv-list" id="q-list"></div>
+  </aside>
+
+  <section class="quest-end" id="quest-end" aria-labelledby="qe-title" hidden>
+    <div class="qe-inner">
+      <div class="qe-stamp" aria-hidden="true"><span>Case<br>closed</span></div>
+      <p class="ch-num" id="qe-kicker"></p>
+      <h2 id="qe-title"></h2>
+      <p class="qe-text" id="qe-text"></p>
+      <div class="ep-actions">
+        <button class="btn primary" id="qe-more">Choose another quest <span aria-hidden="true">→</span></button>
+        <button class="btn ghost-light" id="qe-close">Keep exploring</button>
+      </div>
+    </div>
+  </section>
 
   <!-- Relic timeline -->
   <nav class="timeline" id="timeline" aria-label="Relic timeline">
